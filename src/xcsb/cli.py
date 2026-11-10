@@ -41,9 +41,10 @@ def main(argv=None):
             kw["systems"] = tuple(a.systems)
         res = getattr(tiers, a.tier)(a.out, **kw)
         from mpi4py import MPI
+        ok = MPI.COMM_WORLD.bcast(res.get("pass"), root=0)           # the verdict is formed on the root
         if MPI.COMM_WORLD.Get_rank() == 0:
-            print(json.dumps({"tier": a.tier, "pass": res.get("pass")}, default=float))
-        return 0 if res.get("pass") else 1
+            print(json.dumps({"tier": a.tier, "pass": ok}, default=float))
+        return 0 if ok else 1
     if a.cmd == "run":
         from mpi4py import MPI
 
