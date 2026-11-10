@@ -17,7 +17,7 @@ done_() { [ -f "$XCSB_BUILD/.done_$1" ]; }
 phase_env() {
   done_ env && { echo "env: done"; return; }
   conda create -y -p "$XCSB_ENV" python=3.12 pip
-  conda activate "$XCSB_ENV"
+  set +u; conda activate "$XCSB_ENV"; set -u
   python -m pip install "numpy>=2.0,<2.5" scipy "meson>=1.4" ninja "f90wrap==0.2.16" setuptools wheel pytest \
       "jax==0.11.2" "pyscf==2.14.0" pandas matplotlib
   MPICC="cc -shared" python -m pip install --no-binary=mpi4py mpi4py
@@ -27,7 +27,7 @@ phase_env() {
 
 phase_qe() {
   done_ qe && { echo "qe: done"; return; }
-  conda activate "$XCSB_ENV"
+  set +u; conda activate "$XCSB_ENV"; set -u
   cd "$XCSB_QE"
   [ "$(git rev-parse HEAD)" = 9f93ddec427d2b9a45bb72d828c6d324f62fcabd ] || { echo "QE tree is not qe-7.6 (9f93ddec)"; exit 1; }
   export CFLAGS="-O2 -fPIC" FFLAGS="-O2 -fPIC" try_foxflags="-fPIC"
@@ -42,7 +42,7 @@ phase_qe() {
 
 phase_qepy() {
   done_ qepy && { echo "qepy: done"; return; }
-  conda activate "$XCSB_ENV"
+  set +u; conda activate "$XCSB_ENV"; set -u
   cd "$XCSB_QEPY_SRC"
   [ "$(git rev-parse HEAD)" = eb03de776a0f898bdcf408be62caaa52d6893c59 ] || { echo "QEpy tree is not eb03de77"; exit 1; }
   if ! git diff --quiet; then
@@ -56,7 +56,7 @@ phase_qepy() {
 }
 
 phase_check() {
-  conda activate "$XCSB_ENV"
+  set +u; conda activate "$XCSB_ENV"; set -u
   cd "$REPO"
   python - <<'PY'
 import json, os, subprocess, sys, hashlib
