@@ -94,12 +94,16 @@ def pw_input(case: Case, input_dft: str, pseudo_dir: str, outdir: str, prefix: s
     return "\n".join(lines) + "\n"
 
 
+META_DFTS = {"TPSS", "SCAN", "R2SCAN", "M06L", "TB09"}    # QE input_dft names of the meta-GGAs this host may use natively
+
+
 class QESession:
     """One QEpy Driver (only one can exist per process) and the host-side grid bookkeeping."""
 
     def __init__(self, case: Case, input_dft: str, workdir: str, comm, iterative: bool, pseudo_dir: str | None = None):
         from qepy.driver import Driver
         self.case, self.comm, self.input_dft = case, comm, input_dft
+        self._meta = input_dft.upper() in META_DFTS
         self.rank = comm.Get_rank()
         pseudo_dir = pseudo_dir or os.environ["XCSB_PSEUDO_DIR"]
         os.makedirs(workdir, exist_ok=True)
@@ -124,13 +128,19 @@ class QESession:
                 raise RuntimeError(f"sphere bookkeeping: host counts {self.grid.ngm} G vectors, QE ngm_g = {ngm_g}")
 
     # -- QE -> contract ---------------------------------------------------------------------------------------------
-    def spin_densities(self):
-        """(rho, tau) as (2, n1, n2, n3) Hartree arrays on the root (None elsewhere). Collective."""
+    def spin_densities(self, need_tau: bool = True):
+        """(rho, tau) as (2, n1, n2, n3) Hartree arrays on the root (None elsewhere). Collective.
+        need_tau = False (a native non-meta run feeding a tau-free functional): tau is returned as zeros and never read."""
         rho_qe = self.driver.get_density(gather=True)
-        kin_qe = self.driver.get_kinetic_energy_density(gather=True)
+        if need_tau:
+            if not self._meta:
+                raise RuntimeError(f"tau requested but input_dft {self.input_dft!r} is not a meta-GGA: QE has no tau")
+            kin_qe = self.driver.get_kinetic_energy_density(gather=True)
         if self.rank != 0:
             return None, None
-        return layout.spin_channels(self.nspin, np.asarray(rho_qe), np.asarray(kin_qe), self.shape)
+        rho_qe = np.asarray(rho_qe)
+        kin_qe = np.asarray(kin_qe) if need_tau else np.zeros_like(rho_qe)
+        return layout.spin_channels(self.nspin, rho_qe, kin_qe, self.shape)
 
     # -- contract -> QE ---------------------------------------------------------------------------------------------
     def set_potentials(self, e_xc_ha, v, v_tau):

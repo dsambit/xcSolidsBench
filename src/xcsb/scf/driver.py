@@ -61,8 +61,9 @@ def run_native(case: Case, input_dft: str, workdir: str, comm, host_functional: 
     et, wk = s.eigenvalues()
     rec["eigenvalues_ry"], rec["kweights"] = et.tolist(), wk.tolist()
     if host_functional:
-        rho, tau = s.spin_densities()
-        res = evaluate_on_grid(get_functional(host_functional), s.grid, rho, tau, comm)
+        hf = get_functional(host_functional)
+        rho, tau = s.spin_densities(need_tau=bool(getattr(hf, "is_meta", True)))
+        res = evaluate_on_grid(hf, s.grid, rho, tau, comm)
         if comm.Get_rank() == 0:
             rec["host_exc_ry_on_native_density"] = 2.0 * res.e_xc
             rec["host_stats"] = res.stats
