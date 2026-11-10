@@ -34,8 +34,10 @@ phase_qe() {
   # QE's own gfortran defaults (install/m4/x_ac_qe_f90.m4: -O3 -g, -fallow-argument-mismatch for gfortran >= 10) + -fPIC
   export CFLAGS="-O3 -fPIC" FFLAGS="-O3 -g -fPIC -fallow-argument-mismatch" try_foxflags="-fPIC"
   export BLAS_LIBS="-L${CRAY_LIBSCI_PREFIX_DIR}/lib -lsci_gnu_mp" LAPACK_LIBS="-L${CRAY_LIBSCI_PREFIX_DIR}/lib -lsci_gnu_mp"
-  export FFT_LIBS="-L${FFTW_DIR} -lfftw3_omp -lfftw3"
+  export FFT_LIBS="-L${FFTW_DIR} -lfftw3_omp -lfftw3" FFTW_INCLUDE="${FFTW_INC}"   # QE sets -D__FFTW3 only with FFTW_INCLUDE
   ./configure MPIF90=ftn F90=ftn CC=cc --enable-openmp --with-scalapack=no
+  grep -q -- "-D__FFTW3" make.inc || { echo "make.inc: no FFTW3 backend"; exit 1; }
+  grep -q -- "-fallow-argument-mismatch" make.inc || { echo "make.inc: FFLAGS lost"; exit 1; }
   # QEpy's own recipe drops ' -pg' lines from PIOUD's Makefile
   [ -f PIOUD/src/Makefile ] && sed -i '/ -pg/d' PIOUD/src/Makefile
   make -j"$NP" all || make -j"$NP" all
