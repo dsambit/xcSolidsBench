@@ -65,12 +65,13 @@ phase_check() {
   python - <<'PY'
 import json, os, subprocess, sys, hashlib
 import numpy, scipy, jax, pyscf, mpi4py, qepy
+from mpi4py import MPI
 from qepy.driver import Driver
 from pyscf.dft import libxc
 info = {
   "python": sys.version.split()[0], "numpy": numpy.__version__, "scipy": scipy.__version__, "jax": jax.__version__,
   "pyscf": pyscf.__version__, "libxc": libxc.libxc_version() if hasattr(libxc, "libxc_version") else None,
-  "mpi4py": mpi4py.__version__, "mpi": mpi4py.MPI.Get_library_version().split("\n")[0],
+  "mpi4py": mpi4py.__version__, "mpi": MPI.Get_library_version().split("\n")[0],
   "qepy_file": qepy.__file__, "qe_commit": "9f93ddec427d2b9a45bb72d828c6d324f62fcabd",
   "qepy_commit": "eb03de776a0f898bdcf408be62caaa52d6893c59",
   "patch_sha256": hashlib.sha256(open("patches/qepy-qe76-tau-hook.patch", "rb").read()).hexdigest(),
