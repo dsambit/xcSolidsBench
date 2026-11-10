@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv*/
+
+# build trees (QE, QEpy, any local builds)
+build/
+dist/
+q-e*/
+qepy-src/
+*.o
+*.mod
+*.a
+*.so
+
+# pseudopotentials: never committed (names + sha256 live in pseudo/MANIFEST.json)
+*.upf
+*.UPF
+*.psp8
+pseudo/*/
+
+# grid-level and QE run data: never committed, never on the laptop
+runs/
+*.save/
+*.wfc*
+*.mix*
+*.npz
+*.npy
+*.cube
+*.xsf
+*.dat
+*.hdf5
+*.h5
+charge-density*
+
+# archive worktree (orphan branch `archive`)
+refdata/
+
+# editors / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/
