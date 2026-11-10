@@ -72,7 +72,10 @@ class Toy:
         return orb
 
 
-def check(fname, tol=1e-7, h=2e-3):
+H_LADDER = (2e-3, 3e-4, 1e-4, 3e-5)        # rotation angles; the best rung must meet tol
+
+
+def check(fname, tol=1e-7):
     f = get(fname)
     toy = Toy()
     g = toy.g
@@ -90,10 +93,13 @@ def check(fname, tol=1e-7, h=2e-3):
             gphi = toy.grad_u(phi, ik)
             an2 = 2.0 * toy.wk[ik] * g.weight * np.sum(res.v[s] * np.real(np.conj(phi) * psi)) \
                 + toy.wk[ik] * g.weight * np.sum(res.v_tau[s] * np.real(np.sum(np.conj(gphi) * gpsi, axis=0)))
-            E = {t: evaluate_on_grid(f, g, *toy.densities(toy.rotated(s, ik, i, a, t * h))).e_xc for t in (-2, -1, 1, 2)}
-            fd = (8.0 * (E[1] - E[-1]) - (E[2] - E[-2])) / (12.0 * h)
             scale = abs(an) + 1e-3 * toy.wk[ik] * g.weight * np.sum(np.abs(res.v[s] * psi * phi))
-            err = abs(fd - an) / scale
+            err = np.inf
+            for h in H_LADDER:
+                E = {t: evaluate_on_grid(f, g, *toy.densities(toy.rotated(s, ik, i, a, t * h))).e_xc
+                     for t in (-2, -1, 1, 2)}
+                fd = (8.0 * (E[1] - E[-1]) - (E[2] - E[-2])) / (12.0 * h)
+                err = min(err, abs(fd - an) / scale)
             worst = max(worst, err)
             assert abs(an - an2) < 1e-12 * scale, (s, ik, an, an2)
             assert err < tol, (fname, s, ik, fd, an, err)

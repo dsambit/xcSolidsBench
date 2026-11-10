@@ -1,7 +1,11 @@
-"""Node verification tiers V3-V6 (DESIGN.md Sec. 7). Each writes a JSON summary with its pass/fail numbers.
+"""Node verification tiers V3-V6 (DESIGN.md Sec. 7).
+
+Every SCF runs in its OWN process (`xcsb scf ...`, one srun each): QE keeps functional state (iexch, ...) between QEpy
+Drivers in one process, so a native PBE run followed by a TPSS-carrier run in the same process is refused by QE
+(set_dft_from_name: conflicting values). The comparisons are then made from the records (`xcsb compare v3|v4|v6`).
 
     V3  hooks reproduce QE native: libxc PBE / TPSS through the hooks vs QE's input_dft 'PBE' / 'TPSS', on bulk Si
-        (nspin 1, fixed occupations) and FM bcc Fe (nspin 2, cold smearing); plus the host's E_xc on the native
+        (nspin 1, fixed occupations) and FM bcc Fe (nspin 2, cold smearing); plus the host's E_xc on each native
         ground-state density vs QE's etxc (also on a strained, displaced, low-symmetry Si cell that pins the grid order).
     V4  nspin = 2 at zero magnetization (Si, tot_magnetization = 0) equals nspin = 1.
     V5  the host step is bitwise independent of the rank count (serial evaluation on the root vs all ranks).
@@ -9,6 +13,7 @@
 """
 from __future__ import annotations
 
+import glob
 import json
 import os
 import time
@@ -24,6 +29,7 @@ A_FE = 2.866 * BOHR_PER_ANGSTROM
 TOL_V3_E = 1e-5        # Ry/atom
 TOL_V3_EIG = 1e-5      # Ry
 TOL_V3_MAG = 1e-4      # mu_B / cell
+TOL_V3_EXC = 1e-6      # relative, host E_xc on the native density vs QE etxc
 TOL_V4_E = 1e-8        # Ry
 
 
@@ -45,102 +51,142 @@ def case_fe(**kw):
                 nspin=2, starting_magnetization={"Fe": 0.5}, **kw)
 
 
-def _comm():
+CASES = {
+    "Si": case_si,
+    "Si-lowsym": case_si_lowsym,
+    "Si-nspin2-m0": lambda: case_si(nspin=2, tot_magnetization=0.0),
+    "Fe": case_fe,
+}
+
+
+# ---- one SCF per process ----------------------------------------------------------------------------------------------
+def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None = None):
+    """mode 'native': QE's input_dft = name (host_check: a libxc name for the host E_xc of the native density);
+    mode 'hooked': the functional `name` through the hooks. Writes <out>/record.json."""
     from mpi4py import MPI
-    return MPI.COMM_WORLD
+
+    from .scf.driver import _write, run_hooked, run_native
+    comm = MPI.COMM_WORLD
+    case = CASES[case_name]()
+    rec_path = os.path.join(out, "record.json")
+    if mode == "native":
+        try:
+            rec = run_native(case, name, out, comm, host_functional=host_check)
+            rec["status"] = "ok"
+        except Exception as exc:
+            rec = {"mode": "native", "input_dft": name, "status": "failed", "error": f"{type(exc).__name__}: {exc}"}
+        if comm.Get_rank() == 0:
+            _write(rec_path, rec)
+    else:
+        try:
+            rec = run_hooked(case, name, out, comm, record_path=rec_path)
+        except Exception as exc:
+            rec = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"}
+    rec["case_name"] = case_name
+    return rec
 
 
-def _dump(out, name, obj, comm):
-    if comm.Get_rank() == 0:
-        os.makedirs(out, exist_ok=True)
-        json.dump(obj, open(os.path.join(out, name), "w"), indent=1, default=float)
+def run_dir(root, case_name, mode, name):
+    return os.path.join(root, f"{case_name}__{mode}__{name.replace(':', '_')}")
 
 
-def _guard(res, key, fn):
-    """Run fn() for one case; a failure is recorded (status, error) and the tier continues with the next case."""
-    try:
-        return fn()
-    except Exception as exc:
-        res["cases"][key] = {"status": "failed", "error": f"{type(exc).__name__}: {exc}", "pass": False}
-        return None
+def _load(root, case_name, mode, name):
+    p = os.path.join(run_dir(root, case_name, mode, name), "record.json")
+    if not os.path.exists(p):
+        return {"status": "missing", "path": p}
+    return json.load(open(p))
 
 
 def _cmp(nat, a, b):
     ea, eb = a["energies_ry"]["etot"], b["energies_ry"]["etot"]
     eiga, eigb = np.asarray(a["eigenvalues_ry"]), np.asarray(b["eigenvalues_ry"])
-    out = {"etot_a": ea, "etot_b": eb, "d_etot_per_atom": abs(ea - eb) / nat,
+    out = {"etot_native": ea, "etot_hooked": eb, "d_etot_per_atom": abs(ea - eb) / nat,
            "d_eig_max": float(np.max(np.abs(eiga - eigb))) if eiga.shape == eigb.shape else None,
+           "mag_native": a["magnetization"], "mag_hooked": b["magnetization"],
            "d_mag_total": abs(a["magnetization"]["total"] - b["magnetization"]["total"]),
-           "d_mag_abs": abs(a["magnetization"]["absolute"] - b["magnetization"]["absolute"])}
-    out["pass"] = (out["d_etot_per_atom"] <= TOL_V3_E and out["d_eig_max"] is not None and out["d_eig_max"] <= TOL_V3_EIG
-                   and out["d_mag_total"] <= TOL_V3_MAG and out["d_mag_abs"] <= TOL_V3_MAG)
+           "d_mag_abs": abs(a["magnetization"]["absolute"] - b["magnetization"]["absolute"]),
+           "iterations_hooked": b.get("iterations")}
+    out["pass"] = bool(out["d_etot_per_atom"] <= TOL_V3_E and out["d_eig_max"] is not None
+                       and out["d_eig_max"] <= TOL_V3_EIG and out["d_mag_total"] <= TOL_V3_MAG
+                       and out["d_mag_abs"] <= TOL_V3_MAG)
     return out
 
 
-def v3(out):
-    from .scf.driver import run_hooked, run_native
-    comm = _comm()
-    res = {"tolerances": {"etot_ry_per_atom": TOL_V3_E, "eig_ry": TOL_V3_EIG, "mag_muB": TOL_V3_MAG}, "cases": {}}
-    for cname, mk in (("Si", case_si), ("Fe", case_fe)):
-        c = mk()
-        for qe_name, xc in (("PBE", "PBE"), ("TPSS", "TPSS")):
-            nat = c.structure.nat
+def compare_v3(root):
+    res = {"tolerances": {"etot_ry_per_atom": TOL_V3_E, "eig_ry": TOL_V3_EIG, "mag_muB": TOL_V3_MAG,
+                          "exc_rel": TOL_V3_EXC}, "cases": {}}
+    for cname in ("Si", "Fe"):
+        nat = CASES[cname]().structure.nat
+        for xc in ("PBE", "TPSS"):
+            a, b = _load(root, cname, "native", xc), _load(root, cname, "hooked", xc)
             key = f"{cname}/{xc}"
-            nat_rec = _guard(res, key, lambda: run_native(c, qe_name, os.path.join(out, f"{cname}_{qe_name}_native"),
-                                                           comm, host_functional=xc))
-            hk_rec = nat_rec and _guard(res, key, lambda: run_hooked(c, xc, os.path.join(out, f"{cname}_{xc}_hooked"), comm))
-            if hk_rec is None:
-                _dump(out, "V3.json", res, comm)
+            if a.get("status") != "ok" or b.get("status") != "ok":
+                res["cases"][key] = {"pass": False, "native": a.get("status"), "hooked": b.get("status"),
+                                     "error": a.get("error") or b.get("error")}
                 continue
-            r = _cmp(nat, nat_rec, hk_rec)
-            if comm.Get_rank() == 0:
-                etxc = nat_rec["energies_ry"]["etxc"]
-                r["host_exc_minus_qe_etxc_ry"] = nat_rec["host_exc_ry_on_native_density"] - etxc
-                r["host_exc_rel"] = abs(r["host_exc_minus_qe_etxc_ry"]) / abs(etxc)
-                r["iterations_hooked"] = hk_rec["iterations"]
+            r = _cmp(nat, a, b)
+            etxc = a["energies_ry"]["etxc"]
+            r["host_exc_minus_qe_etxc_ry"] = a["host_exc_ry_on_native_density"] - etxc
+            r["host_exc_rel"] = abs(r["host_exc_minus_qe_etxc_ry"] / etxc)
+            r["pass"] = bool(r["pass"] and r["host_exc_rel"] <= TOL_V3_EXC)
             res["cases"][key] = r
-            _dump(out, "V3.json", res, comm)
-    c = case_si_lowsym()
-    for qe_name in ("PBE", "TPSS"):
-        key = f"Si-lowsym/{qe_name}/host_exc"
-        rec = _guard(res, key, lambda: run_native(c, qe_name, os.path.join(out, f"Si-lowsym_{qe_name}_native"), comm,
-                                                  host_functional=qe_name))
-        if rec is not None and comm.Get_rank() == 0:
-            etxc = rec["energies_ry"]["etxc"]
-            d = rec["host_exc_ry_on_native_density"] - etxc
-            res["cases"][key] = {"qe_etxc": etxc, "host_minus_qe": d, "rel": abs(d / etxc), "pass": abs(d / etxc) < 1e-6}
-    if comm.Get_rank() == 0:
-        res["pass"] = all(v.get("pass", True) for v in res["cases"].values())
-    _dump(out, "V3.json", res, comm)
+    for xc in ("PBE", "TPSS"):
+        a = _load(root, "Si-lowsym", "native", xc)
+        key = f"Si-lowsym/{xc}/host_exc"
+        if a.get("status") != "ok":
+            res["cases"][key] = {"pass": False, "native": a.get("status"), "error": a.get("error")}
+            continue
+        etxc = a["energies_ry"]["etxc"]
+        d = a["host_exc_ry_on_native_density"] - etxc
+        res["cases"][key] = {"qe_etxc": etxc, "host_minus_qe": d, "rel": abs(d / etxc), "pass": bool(abs(d / etxc) <= TOL_V3_EXC)}
+    res["pass"] = all(v["pass"] for v in res["cases"].values())
     return res
 
 
-def v4(out):
-    from .scf.driver import run_hooked
-    comm = _comm()
+def compare_v4(root):
     res = {"tolerance_ry": TOL_V4_E, "cases": {}}
     for xc in ("PBE", "r2SCAN"):
-        r1 = _guard(res, xc, lambda: run_hooked(case_si(), xc, os.path.join(out, f"Si_{xc}_nspin1"), comm))
-        r2 = r1 and _guard(res, xc, lambda: run_hooked(case_si(nspin=2, tot_magnetization=0.0), xc,
-                                                         os.path.join(out, f"Si_{xc}_nspin2_m0"), comm))
-        if r2 is None:
+        a, b = _load(root, "Si", "hooked", xc), _load(root, "Si-nspin2-m0", "hooked", xc)
+        if a.get("status") != "ok" or b.get("status") != "ok":
+            res["cases"][xc] = {"pass": False, "nspin1": a.get("status"), "nspin2": b.get("status")}
             continue
-        d = abs(r1["energies_ry"]["etot"] - r2["energies_ry"]["etot"])
-        res["cases"][xc] = {"etot_nspin1": r1["energies_ry"]["etot"], "etot_nspin2": r2["energies_ry"]["etot"],
-                            "d_etot": d, "mag_abs_nspin2": r2["magnetization"]["absolute"], "pass": d <= TOL_V4_E}
+        d = abs(a["energies_ry"]["etot"] - b["energies_ry"]["etot"])
+        res["cases"][xc] = {"etot_nspin1": a["energies_ry"]["etot"], "etot_nspin2": b["energies_ry"]["etot"],
+                            "d_etot": d, "mag_abs_nspin2": b["magnetization"]["absolute"], "pass": bool(d <= TOL_V4_E)}
     res["pass"] = all(v["pass"] for v in res["cases"].values())
-    _dump(out, "V4.json", res, comm)
     return res
 
 
+def compare_v6(root):
+    res = {"cases": {}}
+    for p in sorted(glob.glob(os.path.join(root, "*__hooked__*", "record.json"))):
+        r = json.load(open(p))
+        key = os.path.basename(os.path.dirname(p))
+        if r.get("status") != "ok":
+            res["cases"][key] = {"status": r.get("status"), "error": r.get("error")}
+            continue
+        h = r["history"]
+        res["cases"][key] = {"status": "ok", "iterations": r["iterations"], "etot_ry": r["energies_ry"]["etot"],
+                             "magnetization": r["magnetization"], "seconds": r["seconds"],
+                             "t_hook_mean_s": float(np.mean([x["t_hook_s"] for x in h])),
+                             "t_iter_mean_s": float(np.mean([x["t_iter_s"] for x in h])),
+                             "min_rho": r.get("density_stats", {}).get("min_rho"),
+                             "frac_tau_below_tauW": r.get("density_stats", {}).get("frac_points_tau_below_tauW")}
+    res["pass"] = bool(res["cases"]) and all(v["status"] == "ok" for v in res["cases"].values())
+    return res
+
+
+# ---- V5: one MPI process group, no QE -----------------------------------------------------------------------------------
 def v5(out, names=("model:test", "r2SCAN", "SCH-SI-A:v3.1")):
     """Bitwise equality of the host step: all ranks vs the root alone (SerialComm), on a synthetic polarized density
     with several chunks."""
+    from mpi4py import MPI
+
     from .functional import get
     from .host.evaluate import evaluate_on_grid
     from .parallel.mpi import SerialComm
     from .testing import BandLimitedDensity, cells, grid_for, tau_above_tw
-    comm = _comm()
+    comm = MPI.COMM_WORLD
     g = grid_for(cells()["triclinic"], 140.0)
     rho = tau = None
     if comm.Get_rank() == 0:
@@ -160,29 +206,6 @@ def v5(out, names=("model:test", "r2SCAN", "SCH-SI-A:v3.1")):
         comm.Barrier()
     if comm.Get_rank() == 0:
         res["pass"] = all(v["bitwise_equal"] for v in res["cases"].values())
-    _dump(out, f"V5_np{comm.Get_size()}.json", res, comm)
-    return res
-
-
-def v6(out, names=("PBE", "r2SCAN", "SCH-SI-A:v3.1", "SCH-SI-B:v3.1"), systems=("Si", "Fe")):
-    from .scf.driver import run_hooked
-    comm = _comm()
-    res = {"ranks": comm.Get_size(), "cases": {}}
-    mk = {"Si": case_si, "Fe": case_fe}
-    for sysname in systems:
-        for xc in names:
-            key = f"{sysname}/{xc}"
-            try:
-                r = run_hooked(mk[sysname](), xc, os.path.join(out, f"{sysname}_{xc.replace(':', '_')}"), comm)
-                res["cases"][key] = {"status": r["status"], "iterations": r["iterations"],
-                                     "etot_ry": r["energies_ry"]["etot"], "magnetization": r["magnetization"],
-                                     "seconds": r["seconds"],
-                                     "t_hook_mean_s": float(np.mean([h["t_hook_s"] for h in r["history"]])),
-                                     "t_iter_mean_s": float(np.mean([h["t_iter_s"] for h in r["history"]])),
-                                     "min_rho": r.get("density_stats", {}).get("min_rho")}
-            except Exception as exc:
-                res["cases"][key] = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"}
-            _dump(out, f"V6_np{comm.Get_size()}.json", res, comm)
-    res["pass"] = all(v["status"] == "ok" for v in res["cases"].values())
-    _dump(out, f"V6_np{comm.Get_size()}.json", res, comm)
+        os.makedirs(out, exist_ok=True)
+        json.dump(res, open(os.path.join(out, f"V5_np{comm.Get_size()}.json"), "w"), indent=1, default=float)
     return res

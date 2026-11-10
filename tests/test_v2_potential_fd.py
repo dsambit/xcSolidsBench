@@ -33,30 +33,32 @@ def d5(E, base, delta, amp):
     return (8.0 * (e[1] - e[-1]) - (e[2] - e[-2])) / (12.0 * amp)
 
 
-def fd_spin(f, g, rho, tau, eps=(2e-3, 1e-2), tol=1e-7):
+RHO_LADDER = (2e-3, 3e-4, 1e-4, 3e-5)      # relative FD amplitudes: truncation falls, rounding grows down the ladder;
+TAU_LADDER = (1e-2, 3e-3, 1e-3)            # the check passes if the best rung meets tol (SCH-SI is strongly nonlinear)
+
+
+def fd_spin(f, g, rho, tau, tol=1e-7):
     res = evaluate_on_grid(f, g, rho, tau, chunk=4096)
-    worst = 0.0
+    report = {}
     for s in range(2):
         for which in ("rho", "tau"):
             delta = np.zeros((2,) + g.shape)
             delta[s] = sphere_limited_random(g, seed=17 + 3 * s + (which == "tau"))
             base = rho if which == "rho" else tau
-            amp = eps[which == "tau"] * float(np.mean(base[s]))
-            if which == "rho":
-                fd = d5(lambda r: energy(f, g, r, tau), rho, delta, amp)
-                an = g.integrate(res.v[s] * delta[s])
-                scale = g.integrate(np.abs(res.v[s] * delta[s]))
-            else:
-                fd = d5(lambda t: energy(f, g, rho, t), tau, delta, amp)
-                an = g.integrate(res.v_tau[s] * delta[s])
-                scale = g.integrate(np.abs(res.v_tau[s] * delta[s]))
-            if scale == 0.0:                                 # a tau-free functional: v_tau = 0 exactly
-                assert abs(fd) < 1e-12, (f.name, which, s, fd)
-                continue
-            err = abs(fd - an) / scale                       # relative to the L1 pairing (cancellation-safe)
-            worst = max(worst, err)
-            assert err < tol, (f.name, which, s, fd, an, err)
-    return worst
+            pot = res.v[s] if which == "rho" else res.v_tau[s]
+            an = g.integrate(pot * delta[s])
+            scale = g.integrate(np.abs(pot * delta[s]))
+            E = (lambda r: energy(f, g, r, tau)) if which == "rho" else (lambda t: energy(f, g, rho, t))
+            errs = {}
+            for eps in (RHO_LADDER if which == "rho" else TAU_LADDER):
+                fd = d5(E, base, delta, eps * float(np.mean(base[s])))
+                if scale == 0.0:                              # a tau-free functional: v_tau = 0 exactly
+                    errs[eps] = abs(fd)
+                else:
+                    errs[eps] = abs(fd - an) / scale          # relative to the L1 pairing (cancellation-safe)
+            report[(s, which)] = errs
+            assert min(errs.values()) < (1e-12 if scale == 0.0 else tol), (f.name, which, s, errs)
+    return report
 
 
 @pytest.mark.parametrize("name", ["model:test", "PBE", "r2SCAN"])
