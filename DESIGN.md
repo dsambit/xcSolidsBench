@@ -231,9 +231,10 @@ QEpy can replace QE's XC energy and multiplicative potential (exttype 4, extpot,
    `errore` if extkin is allocated in a non-meta run.
 4. `src/pw/qepy_mod.f90`: `qepy_set_extkin(vin, gather)`, a copy of `qepy_set_extpot` (scatter from the root, nspin columns: per
    spin for nspin = 2).
-5. `qepy/driver.py`: `Driver.set_external_kinetic_potential(potential, gather=True)`.
+5. No change to `qepy/driver.py`: the host calls `qepy_mod.qepy_set_extkin` directly, after the same group broadcast that
+   `Driver.set_external_potential` performs (implementation 2026-11-10: the patch is Fortran-only).
 6. For the ripple-seeded restart of M1 step 1 (Sec. 6.2): `qepy_set_tau(tau, gather)` in `qepy_mod.f90`, a mirror of the existing
-   `qepy_set_rho` for `rho%kin_r` (per spin, then `rho_r2g` into `rho%kin_g`), and `Driver.set_kinetic_energy_density(...)`.
+   `qepy_set_rho` for `rho%kin_r` (per spin, then `rho_r2g` into `rho%kin_g`).
 
 Everything downstream exists in QE: set_vrs interpolates v%kin_r into kedtau, h_psi_meta applies −∇·(kedtau∇ψ) per spin, delta_e and
 delta_escf contain the −∫kin_r v%kin_r terms, mix_rho mixes τ. The patch is CPU-only (OpenACC clauses untouched; GPU builds are
