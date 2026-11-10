@@ -1,6 +1,7 @@
 # xcSolidsBench: design (phase 0)
 
-Status: DESIGN ONLY (2026-11-10), for the user's review. Nothing here is implemented yet.
+Status: DESIGN ONLY (2026-11-10), for the user's review. Nothing here is implemented yet; implementation (M0 infrastructure and
+verification tiers, then M1 starting with the cutoff ladder) waits for the user's go.
 
 A modular solid-state test bench for exchange-correlation functionals of the per-spin inputs
 (ρ_σ, ∇ρ_σ, τ_σ, ∇²ρ_σ) and optionally the density Hessian ∇∇ρ_σ, run self-consistently (generalized Kohn-Sham, GKS) in
@@ -18,7 +19,7 @@ facts the design relies on are cited by file in Sec. 4.1. No code from any other
 | # | milestone | content |
 |---|---|---|
 | M0 | infrastructure and verification | contract, adapters, spectral host, τ hook (QEpy patch), SCF driver, tiers V1-V6 (Sec. 7), Perlmutter build |
-| **M1** | **magnetism of bcc Fe and bcc V** (first benchmark, user 2026-11-10) | nspin = 2, experimental lattice constants, fixed lattice; spin moment per atom, E(FM) − E(NM); SCH-SI-A:v3.1, SCH-SI-B:v3.1 vs PBE, r2SCAN (libxc through the hooks) |
+| **M1** | **magnetism of bcc Fe and bcc V** (first benchmark, user 2026-11-10) | step 1: the cutoff ladder with drift diagnosis (Sec. 6.2); step 2: k-mesh/smearing; step 3: moments. nspin = 2, experimental lattice constants, fixed lattice; spin moment per atom, E(FM) − E(NM); SCH-SI-A:v3.1, SCH-SI-B:v3.1 vs PBE, r2SCAN (libxc through the hooks) |
 | M2 | lattice-constant scans | Fe and V first (E(V) with spin, at the M1 settings), then LC20 lattice constants and bulk moduli (family F1) |
 | M3 | ferromagnetic metals (F2) | bcc Fe, hcp Co, fcc Ni: moments and lattice constants with spin |
 | M4 | paramagnetic metals (F3) | bcc V, fcc Pd: spurious magnetism (FM vs NM starts and energies; the moment should collapse to 0) |
@@ -231,6 +232,8 @@ QEpy can replace QE's XC energy and multiplicative potential (exttype 4, extpot,
 4. `src/pw/qepy_mod.f90`: `qepy_set_extkin(vin, gather)`, a copy of `qepy_set_extpot` (scatter from the root, nspin columns: per
    spin for nspin = 2).
 5. `qepy/driver.py`: `Driver.set_external_kinetic_potential(potential, gather=True)`.
+6. For the ripple-seeded restart of M1 step 1 (Sec. 6.2): `qepy_set_tau(tau, gather)` in `qepy_mod.f90`, a mirror of the existing
+   `qepy_set_rho` for `rho%kin_r` (per spin, then `rho_r2g` into `rho%kin_g`), and `Driver.set_kinetic_energy_density(...)`.
 
 Everything downstream exists in QE: set_vrs interpolates v%kin_r into kedtau, h_psi_meta applies −∇·(kedtau∇ψ) per spin, delta_e and
 delta_escf contain the −∫kin_r v%kin_r terms, mix_rho mixes τ. The patch is CPU-only (OpenACC clauses untouched; GPU builds are
@@ -247,7 +250,7 @@ through the same path with v_τ = 0.
 - **ecutrho = d·ecutwfc, d ≥ 4.** |ψ|² and Σ|∇ψ|² (support within 2√ecutwfc) then lie in the ecutrho sphere, the FFT grid is
   alias-free for them, and ρ_out,σ(r_k) ≥ 0 and τ_out,σ ≥ τ_W,σ hold exactly at the grid points (symmetrization averages
   nonnegative band-limited functions; convexity of |∇ρ|²/ρ keeps τ ≥ τ_W). d is the integration-grid knob: d = 4 is the protocol;
-  d = 6, 8 refine only the quadrature of the nonlinear e_xc (QE's doublegrid Fourier-interpolates ρ, τ to the dense grid and v,
+  d = 8 (the check of M1 step 1) refines only the quadrature of the nonlinear e_xc (QE's doublegrid Fourier-interpolates ρ, τ to the dense grid and v,
   v_τ back): the aliasing check that the v3.1 handoff asks for.
 - **Mixed densities** (Broyden) are not guaranteed nonnegative. The host raises on any ρ_σ < 0 (count, minimum, integrated negative
   charge, iteration): no clipping, no floor. Not expected in bulk solids; if it occurs the remedy is the user's decision (Q6).
@@ -305,14 +308,27 @@ failure (MAXITER, negative ρ_σ, NaN, any QE error): raise; the record is writt
 
 ### 6.0 Convergence protocol (all families)
 
-Per system, done with PBE through the hooks, then confirmed with SCH-SI-A and -B (the v3.1 handoff warns that the model's energy
-has no minimizer in a complete basis because of its Laplacian and Hessian dependence, so a plane-wave limit is not guaranteed):
+**Why the cutoff needs care (the user's own documented result).** SCH-SI has no energy minimizer in a complete basis:
+xcHoleModelMeta `strongxc-v3`, `productionModelMathematicalFormulation.tex`, paragraph "Basis regularization (user 2026-10-13)"
+and the exact-conditions row "variational stability" (status: no); proof in the archive note `refdata/notes/brLaplacianInstability`
+(Theorem 1: a semilocal energy density that depends on ∇²ρ, or on the Hessian, is lower semicontinuous along ripple sequences only
+if it is convex in it, and a convex function bounded above is constant; so no semilocal Laplacian-dependent hole model is ripple
+stable). Mechanism (the note's Lemma 1): multiplying every occupied orbital of a spin channel by a common factor
+g = 1 + (A/k²) h(k n·r) gives ρ' = g²ρ and τ' − τ_W' = g²(τ − τ_W) exactly; as k → ∞, δρ = O(A/k²), δ∇ρ = O(A/k), δτ = O(A/k),
+while ∇²ρ moves by an O(A) amount (the Hessian by A W ρ ψ nnᵀ), at a kinetic cost O(A/k², A²/k²). Since τ − τ_W is invariant,
+ellipticity (1 + ∂e/∂τ_σ > 0, which v3 makes hold on real densities) does not stabilize it. Where e is concave in ∇²ρ (BR: reduced
+curvature z < −0.861), averaging over the ripple lowers the energy. Gaussian bases cannot represent the ripple and regularize the
+model (stable in cc-pV6Z; tight even-tempered sets drift); plane waves approach a complete basis as ecutwfc grows, so the
+plane-wave limit may drift. Hence M1 starts with a cutoff ladder (Sec. 6.2, step 1), and every family repeats it.
 
-- ecutwfc ladder in steps of 10-20 Ry up to about twice the PBE-converged value, looking for a drift that does not level off;
-- d = ecutrho/ecutwfc: 4 (protocol) vs 6 and 8 at the final ecutwfc (quadrature / aliasing);
-- k-mesh (Monkhorst-Pack, Γ-centred) and degauss converged together; reported quantities at fixed settings must change by less
+Per system, with all functionals of the lane:
+
+- ecutwfc ladder up to well beyond the PBE-converged value (×2-3), looking for a drift that does not level off (Sec. 6.2 step 1);
+- d = ecutrho/ecutwfc: 4 (protocol) and a check at 8 (quadrature / aliasing);
+- k-mesh (Monkhorst-Pack, Γ-centred) and degauss converged together at the chosen cutoff; reported quantities must change by less
   than the family's criterion between the last two rungs;
-- if SCH-SI shows no plateau in ecutwfc, the bench reports it and stops that lane; it never picks a cutoff to hide it.
+- if SCH-SI drifts with ecutwfc, the bench reports it, stops the SCH-SI lanes and brings it to the user; it never picks a cutoff to
+  hide it.
 
 | family | criteria between the last two rungs |
 |---|---|
@@ -344,6 +360,43 @@ stated with every table. The files go to `$W/pseudo/sg15-1.2/` with sha256 in `p
 
 - bcc, one atom per primitive cell, experimental lattice constants (sourced, Sec. 8; Q10), fixed lattice.
 - Functionals: SCH-SI-A:v3.1, SCH-SI-B:v3.1, PBE, r2SCAN (libxc through the hooks).
+
+**Step 1: the cutoff ladder (user decision 2026-11-10; comes first).**
+
+- Systems: bcc Fe (FM start) and bcc V (NM start: starting_magnetization = 0.0; FM start), nspin = 2, fixed experimental lattice.
+  k-mesh and cold smearing held at a generous fixed setting during the ladder (e.g. 20³, degauss 0.01 Ry; converged in step 2).
+- Functionals: PBE, r2SCAN, SCH-SI-A:v3.1, SCH-SI-B:v3.1; every SCF from a cold start.
+- Ladder: first PBE alone finds its conventional converged cutoff E_c^PBE (the F2/F3 criteria of the table above); then all four
+  functionals on ecutwfc/E_c^PBE ∈ {0.6, 0.8, 1, 1.25, 1.5, 2, 2.5, 3}, at d = 4, plus d = 8 at ecutwfc/E_c^PBE = 1, 2 and 3.
+- Reported per rung and functional: E_tot per atom, the spin moment per atom (and absolute magnetization), for V E(FM start) −
+  E(NM start), and the SCF iteration count (plus the history of Sec. 5).
+- Drift diagnosis:
+  - (a) Shape: successive differences ΔE_n = E(rung n) − E(rung n−1). PBE and r2SCAN set the expected pattern (monotone,
+    shrinking differences, plateau). For SCH-SI: is the decrease monotone, do the differences shrink or grow with the cutoff, and
+    does the excess over the PBE pattern scale with ecutwfc (e.g. with the ripple wavenumber the basis can represent, √ecutwfc)?
+    Tables only, linear-axis plots.
+  - (b) BR-concave population: per rung, the fraction of electrons with reduced curvature z_σ < z* = −0.861,
+    z_σ = 3Q_σ/(2π^{2/3}ρ_σ^{5/3}), Q_σ = ⅙[∇²ρ_σ − 4λ(τ_σ − τ_W,σ)] (the SCH-SI curvature, λ from the record; formulation
+    Q_σ of the exchange iso end), i.e. Σ_σ ∫ρ_σ [z_σ < z*] / N on the grid. A diagnostic of the converged density, not part of
+    the model or the potential. Reported for every functional's density (the PBE value is the reference).
+  - (c) Ripple-seeded restart at the highest rung: take the converged state, apply the common-factor ripple of the note's Lemma 1
+    at the density level, ρ_σ' = g²ρ_σ and τ_σ' = g²τ_σ + ½g∇g·∇ρ_σ + ½ρ_σ|∇g|² (exact for a common orbital factor), with
+    g = 1 + (A/k²) Σ_{k ∈ star} cos(k·r): a symmetric star of reciprocal-lattice vectors, so QE's symmetrization keeps it, |k| near
+    the largest wavenumber the orbitals represent, both fields projected onto the ecutrho sphere (P); several amplitudes A. Then
+    re-converge with the hook (the converged orbitals as the starting wavefunctions). Reported: E before and after, the amplitude of
+    the seeded Fourier components of ρ_σ and of ∇²ρ_σ before and after (decay = locally stable; persistence or growth with a lower
+    energy = the SCF finds a rippled state). Needs one more QEpy setter, `qepy_set_tau` (Sec. 4.4, item 6).
+- Outcome rule:
+  - plateau (SCH-SI follows the PBE pattern; the last two rungs within the criteria; (c) relaxes back to the unrippled state with
+    no lower energy): converged cutoffs as usual, the M1 steps 2-3 follow;
+  - drift (no plateau, or (c) finds a lower rippled state): report it, stop the SCH-SI lanes (PBE and r2SCAN continue), and bring
+    it to the user. Options for the user: define the model at a stated per-element cutoff, or prioritize the nonlocal ∇²ln ρ
+    smoothing.
+
+**Step 2:** k-mesh and degauss converged together at the chosen cutoff (Sec. 6.0 criteria), with PBE and confirmed with SCH-SI.
+
+**Step 3: the moments** at the chosen cutoff and k-mesh:
+
 - Runs per functional and metal: (1) NM: nspin = 1 (exactly nonmagnetic); (2) FM start: nspin = 2 with a large starting moment,
   converged freely; (3) V: also an NM start in nspin = 2 (starting_magnetization = 0.0 set explicitly; the random part of the
   starting orbitals breaks the up/down symmetry slightly, so a spurious instability can still develop).
@@ -507,13 +560,14 @@ checking with squeue that the user has fewer than 2 interactive jobs across all 
 
 | family | cells, grid (d = 4) | per SCF (one 128-core node unless stated) | campaign |
 |---|---|---|---|
-| M1 Fe, V | 1 atom; ecutwfc ~100-120 Ry; 32³-36³; ~1.5·10³ PW; 20³-24³ k (≈ 250-450 irreducible) | 2-5 s/step, 40-80 steps: 2-7 min | ~40 convergence SCFs per metal + 4 functionals × 2 metals × 3 runs: ≈ 2 node-h (one allocation) |
+| M1 step 1, cutoff ladder | 1 atom; E_c^PBE ~100 Ry assumed; up to ×3: 300 Ry, grid 32³ → ~56³, ~1.5·10³ → ~8·10³ PW; 20³ k | 2-7 min at the low rungs, ~10-40 min at ×3 (QE cost ∝ PW count; SCH-SI ~3 s/step at 56³) | 8 rungs × 4 functionals × 3 states (Fe FM, V NM, V FM) ≈ 100 SCFs + d = 8 checks + ripple restarts: ≈ 8-15 node-h (several allocations, or batch, Q7) |
+| M1 steps 2-3, Fe, V | 1 atom; ecutwfc from step 1; 20³-24³ k (≈ 250-450 irreducible) | 2-5 s/step, 40-80 steps: 2-7 min at ~100 Ry | k/smearing study (mostly PBE) + 4 functionals × 2 metals × 3 runs: ≈ 2 node-h |
 | F1 LC20 | 1-2 atoms; 32³-48³, alkali metals up to ~60³ | 2-15 min (SCH-SI dominates on the large grids) | 11 volumes × 20 solids × 4 functionals ≈ 900 SCFs, packed 4 lanes per node: ≈ 10-60 node-h, plus convergence |
 | F2 Fe, Co, Ni | 1-2 atoms | 2-10 min | moments + E(V) scans × 4 functionals: ≈ 5-10 node-h |
 | F3 V, Pd | 1 atom | 2-7 min | 3 starts × E(V) scans × 4 functionals: ≈ 3-6 node-h |
 | F4 FeO, CoO, NiO | 4 atoms (2 f.u.); ~120 Ry (O and TM semicore); ~72³ (~4·10⁵ points); ~5·10³ PW; 6³-8³ k | ~10 s/step, 80-150 steps: 15-25 min; the `nosym` run several times longer | 3 runs × 3 oxides × 4 functionals + convergence: ≈ 15-30 node-h |
 
-M1 fits one or two interactive allocations. F1, F4 and the full F2/F3 scans exceed what a few 4 h interactive allocations can do;
+M1 steps 2-3 fit one allocation; the step-1 ladder needs several (its top rungs dominate). F1, F4 and the full F2/F3 scans exceed what a few 4 h interactive allocations can do;
 batch jobs would need the user's permission (Q7).
 
 ---
@@ -525,7 +579,8 @@ batch jobs would need the user's permission (Q7).
   reference-functional results? Literature in the existing workspace literature archive, or in this repo's archive?
 - Q3. SG15 version: 1.2 (the latest; all needed elements present), fixed for the whole bench?
 - Q4. Moments: compare the spin moment (via g′) with the computed spin moment, the total moment reported alongside?
-- Q5. Cutoffs: one global ecutwfc for all systems, or per-system converged values fixed across functionals (proposed)?
+- Q5. Cutoffs (if the ladder plateaus): one global ecutwfc for all systems, or per-system converged values fixed across
+  functionals (proposed)?
 - Q6. Negative mixed densities: the host raises. If they appear (atoms in boxes, M8), which structural remedy do you want?
 - Q7. Batch permission for F1 (and F4), once the M1 timings are known.
 - Q8. PBE-D4 for solids: report raw and + D4 for lattice constants and bulk moduli (the v3.1 handoff asks the collaborator for both)?
@@ -533,6 +588,14 @@ batch jobs would need the user's permission (Q7).
 - Q10. Fixed lattices (M1, F2-F4 moments): low-temperature experimental values with or without zero-point correction? Proposed:
   zero-point-corrected where the source provides it, the uncorrected value reported alongside.
 - Q11. "Sol62": Zhang et al. (NJP 2018) has 64 solids. Which 62 do you mean (which two are dropped, and why)?
+- Q12. F4: is QE's sphere-integrated site moment (fixed radius per element) acceptable, or do you prefer a Löwdin projection?
 - Q13. EOS window: our ±12 % in V (11 points) or Zhang et al.'s ±20 % (7-11 points)? ±12 % keeps the fit near the minimum; ±20 %
   matches their protocol for direct comparison with their tables.
-- Q12. F4: is QE's sphere-integrated site moment (fixed radius per element) acceptable, or do you prefer a Löwdin projection?
+- Q14. Ladder plateau criterion: plateau = the last two rungs within the F2/F3 criteria (moment 0.005 μB, 1 meV/atom) and
+  successive differences shrinking as for PBE; drift = anything else, or a lower rippled state in (c). Acceptable, or a different
+  threshold?
+- Q15. Ripple-seeded restart: amplitudes A (proposed: ripple factors with max |g − 1| = 10⁻³, 10⁻², 5·10⁻²) and wavenumber (the
+  largest symmetric star with |k| ≤ 0.8 √ecutwfc, in bohr⁻¹ with ecutwfc in Ry); seed at the density level (proposed, needs only `qepy_set_tau`) or at the
+  orbital level (needs write access to QE's wavefunctions)?
+- Q16. If the ladder drifts: per-element cutoff definition of the model, or the nonlocal ∇²ln ρ smoothing first (your decision
+  after the ladder results)?
