@@ -85,6 +85,11 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
     record_path = record_path or os.path.join(workdir, "record.json")
     e_prev = None
     try:
+        # Start: the density of the starting orbitals. One diagonalization in the carrier's starting potential (QE potinit,
+        # the same for every functional) gives rho_out = sum f |psi|^2 >= 0 and tau_out >= tau_W exactly (DESIGN 4.5);
+        # the atomic superposition itself is not positive (e.g. SG15 Fe: negative charge 0.85 e), so the hook never sees it.
+        s.driver.diagonalize()
+        rec["start"] = "density of the starting orbitals (one diagonalization in the carrier's potinit potential)"
         for it in range(1, maxiter + 1):
             ti = time.time()
             rho, tau = s.spin_densities()

@@ -278,7 +278,9 @@ through the same path with v_τ = 0.
 One SCF per (structure, magnetic order, functional, settings); QEpy iterative mode; cold start:
 
 ```
-start: QE potinit (atomic ρ, Thomas-Fermi τ; starting_magnetization per species) + wfcinit
+start: QE potinit (atomic ρ; starting_magnetization per species) + wfcinit, then ONE diagonalization in that starting
+       potential: the hook starts from the density of the starting orbitals (ρ_out ≥ 0, τ_out ≥ τ_W exactly), never from
+       the atomic superposition, which is not positive (SG15 Fe: 0.85 e of negative charge; found in M0, 2026-11-10)
 loop i = 1..MAXITER:
     hook:        ρ_σ, τ_σ <- QE;  e, d <- functional;  v_σ, v_τ,σ <- spectral;  set extpot, extkin, extene (exttype 4)
     diagonalize: QE rebuilds v (Hartree + extpot; v%kin_r <- extkin), c_bands, sum_band -> ρ_out, τ_out
