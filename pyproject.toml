@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xcsb"
+version = "0.0.1"
+description = "xcSolidsBench: solid-state tests of XC functionals of (rho, grad rho, tau, lap rho, Hessian) in QE 7.6 via QEpy"
+requires-python = ">=3.11"
+dependencies = ["numpy", "scipy", "jax", "pyscf"]
+
+[project.optional-dependencies]
+mpi = ["mpi4py"]
+test = ["pytest"]
+
+[project.scripts]
+xcsb = "xcsb.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "node: needs a Perlmutter compute node (QE/QEpy, MPI or the xchole JIT); run with -m node",
+]
+addopts = "-m 'not node'"

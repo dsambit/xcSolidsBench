@@ -1,0 +1,129 @@
+{
+ "family": "SG15 ONCV",
+ "version": "1.2",
+ "url": "http://www.quantum-simulation.org/potentials/sg15_oncv/upf/",
+ "retrieved": "2026-11-10",
+ "note": "files are never committed; sha256 of each UPF as downloaded",
+ "files": {
+  "Ag": {
+   "file": "Ag_ONCV_PBE-1.2.upf",
+   "sha256": "b0216b7160c3bcde4e0f1ce725900cab0c7d8a9adcc77192f99ad30ee0e92ad6",
+   "z_valence": 19.0
+  },
+  "Al": {
+   "file": "Al_ONCV_PBE-1.2.upf",
+   "sha256": "910b34816f7b34c3be772ab3c61b03aa569b45cbff9f73ef21269e70a19fa3bc",
+   "z_valence": 11.0
+  },
+  "As": {
+   "file": "As_ONCV_PBE-1.2.upf",
+   "sha256": "2b81eaac7fb479565ed080c292d6f74507d16090522e4ac0b8e2b1b86c089d64",
+   "z_valence": 5.0
+  },
+  "Ba": {
+   "file": "Ba_ONCV_PBE-1.2.upf",
+   "sha256": "20f5ae5849873dbc054a149f592332b8d51d6b1816c319d5fe84d928ab069a6e",
+   "z_valence": 10.0
+  },
+  "C": {
+   "file": "C_ONCV_PBE-1.2.upf",
+   "sha256": "1c674ec4fe19ee85db53e6b9ecf7cd40e70eda362cedd83f7c51c9c4081ea064",
+   "z_valence": 4.0
+  },
+  "Ca": {
+   "file": "Ca_ONCV_PBE-1.2.upf",
+   "sha256": "a1c10b132863a6a9817c55b80cc720df6c83143326b2c74d6b8d1e9b6e42be5d",
+   "z_valence": 10.0
+  },
+  "Cl": {
+   "file": "Cl_ONCV_PBE-1.2.upf",
+   "sha256": "e374f17c5ed0e3290e059e174acddda4ddb1341c1122d99be9977cb7004655ba",
+   "z_valence": 7.0
+  },
+  "Co": {
+   "file": "Co_ONCV_PBE-1.2.upf",
+   "sha256": "dd84fc7d3b2dae0730344f3d1e05929f90147b2b52300dbc42de6d6d5470cd3e",
+   "z_valence": 17.0
+  },
+  "Cu": {
+   "file": "Cu_ONCV_PBE-1.2.upf",
+   "sha256": "ef9b82afdafc6a3bf4fedaa26d61d1444543f262ae187200dbf433bf5db09203",
+   "z_valence": 19.0
+  },
+  "F": {
+   "file": "F_ONCV_PBE-1.2.upf",
+   "sha256": "c896fba787ae0302b67683e27bf2d174b29bc494686178599eeeceb6868138b5",
+   "z_valence": 7.0
+  },
+  "Fe": {
+   "file": "Fe_ONCV_PBE-1.2.upf",
+   "sha256": "0f83c0be7f24a0b09323c0f0329438f2b824dd15d48dd4a8201cad405cf9e886",
+   "z_valence": 16.0
+  },
+  "Ga": {
+   "file": "Ga_ONCV_PBE-1.2.upf",
+   "sha256": "77d9f1de60bfc90deb8c7832347ffef0f45affa1718b969f76cdb22a9d026a7a",
+   "z_valence": 13.0
+  },
+  "Ge": {
+   "file": "Ge_ONCV_PBE-1.2.upf",
+   "sha256": "fca761fca34b08d7c730fb3faeabfedeb9910de671335f0de948727d84748352",
+   "z_valence": 14.0
+  },
+  "K": {
+   "file": "K_ONCV_PBE-1.2.upf",
+   "sha256": "643d45533495f4fdc8815bc142359c76797f1b368f4db905181ea690fba75a86",
+   "z_valence": 9.0
+  },
+  "Li": {
+   "file": "Li_ONCV_PBE-1.2.upf",
+   "sha256": "f9d95d0b0055c6a91c45c2a2a8e41923668db0609c9f3b2c267fb46da95ed640",
+   "z_valence": 3.0
+  },
+  "Mg": {
+   "file": "Mg_ONCV_PBE-1.2.upf",
+   "sha256": "005153e25136fbb57f010125fd926aa70f92fbf0965d441de63edd16cc5f3053",
+   "z_valence": 10.0
+  },
+  "Na": {
+   "file": "Na_ONCV_PBE-1.2.upf",
+   "sha256": "5c74594bad5d585c979c12a14c68cc799bd27f2d425f0b6d29aeab427a83f47b",
+   "z_valence": 9.0
+  },
+  "Ni": {
+   "file": "Ni_ONCV_PBE-1.2.upf",
+   "sha256": "e6a7b028f02fccddb9158a150c7b16202af4741e8f5000e50df5ccc4b8122d3e",
+   "z_valence": 18.0
+  },
+  "O": {
+   "file": "O_ONCV_PBE-1.2.upf",
+   "sha256": "bf397a93a4ffafcf86a08fe73d38b2e0c15e83716fdd5e74ede5439dd7328d1f",
+   "z_valence": 6.0
+  },
+  "Pd": {
+   "file": "Pd_ONCV_PBE-1.2.upf",
+   "sha256": "4be14b49b1d860ee99b68f76cf0d8fe5f4c780ff0f76c6b2333ff45eae51f687",
+   "z_valence": 18.0
+  },
+  "Rh": {
+   "file": "Rh_ONCV_PBE-1.2.upf",
+   "sha256": "6adf4891ae4554f71658b63968f66d53dcf9c61cf49f94aa88a36caff2e7eac4",
+   "z_valence": 17.0
+  },
+  "Si": {
+   "file": "Si_ONCV_PBE-1.2.upf",
+   "sha256": "73d21061e1050ef8134ba50a20e61b9d0bcef98d0a9e0a110bbd076e47282eee",
+   "z_valence": 4.0
+  },
+  "Sr": {
+   "file": "Sr_ONCV_PBE-1.2.upf",
+   "sha256": "e5e969e3df6aa1252b8009925d8bc9d00283b26c10454b3de541dfdb37847bec",
+   "z_valence": 10.0
+  },
+  "V": {
+   "file": "V_ONCV_PBE-1.2.upf",
+   "sha256": "464dbd069327a68eb23f142f1876fead908d5175eacde3d9cd3d507fd25d5048",
+   "z_valence": 13.0
+  }
+ }
+}

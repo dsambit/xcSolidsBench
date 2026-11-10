@@ -1,0 +1,149 @@
+diff --git a/src/pw/qepy_common.f90 b/src/pw/qepy_common.f90
+index f0c45ad..1a9299d 100644
+--- a/src/pw/qepy_common.f90
++++ b/src/pw/qepy_common.f90
+@@ -122,6 +122,8 @@ MODULE qepy_common
+       type(stress_base)               :: stress
+       CHARACTER(len=256)              :: task = 'scf'
+       real(kind=dp), allocatable      :: extpot(:,:)
++      real(kind=dp), allocatable      :: extkin(:,:)
++      !! xcSolidsBench tau hook: added to v%kin_r (d e_xc / d tau, per spin) before set_vrs
+       real(kind=dp)                   :: extene = 0.d0
+       integer                         :: exttype = 0
+       real(kind=dp), allocatable      :: extforces(:,:)
+@@ -152,6 +154,7 @@ MODULE qepy_common
+    CONTAINS
+       !--------------------------------------------------------------------------------
+       PROCEDURE :: allocate_extpot
++      PROCEDURE :: allocate_extkin
+       PROCEDURE :: allocate_extforces
+       PROCEDURE :: free => free_embed
+    end type embed_base
+@@ -211,6 +214,7 @@ CONTAINS
+       CLASS(embed_base), INTENT(INOUT) :: obj
+       !
+       IF (ALLOCATED(obj%extpot)) DEALLOCATE(obj%extpot)
++      IF (ALLOCATED(obj%extkin)) DEALLOCATE(obj%extkin)
+       IF (ALLOCATED(obj%extforces)) DEALLOCATE(obj%extforces)
+       call obj%tddft%free()
+       !
+@@ -242,6 +246,24 @@ CONTAINS
+       ENDIF
+    END SUBROUTINE
+    !
++   SUBROUTINE allocate_extkin(embed)
++      ! xcSolidsBench tau hook: the tau potential array, same layout as extpot (dfftp%nnr x nspin, per spin)
++      USE kinds,                ONLY : DP
++      USE fft_base,             ONLY : dfftp
++      USE lsda_mod,             ONLY : lsda, nspin
++      !
++      IMPLICIT NONE
++      CLASS(embed_base), INTENT(INOUT) :: embed
++      !
++      IF (ALLOCATED(embed%extkin)) THEN
++         IF (SIZE(embed%extkin, 1) /= dfftp%nnr) DEALLOCATE(embed%extkin)
++      ENDIF
++      IF (.NOT.ALLOCATED(embed%extkin)) THEN
++         ALLOCATE(embed%extkin(dfftp%nnr, nspin))
++         embed%extkin = 0.0_DP
++      ENDIF
++   END SUBROUTINE
++   !
+    SUBROUTINE allocate_extforces(embed)
+       USE kinds,                ONLY : DP
+       USE fft_base,             ONLY : dfftp
+diff --git a/src/pw/qepy_mod.f90 b/src/pw/qepy_mod.f90
+index 6047797..8652197 100644
+--- a/src/pw/qepy_mod.f90
++++ b/src/pw/qepy_mod.f90
+@@ -285,6 +285,60 @@ CONTAINS
+       !
+    END SUBROUTINE
+ 
++   SUBROUTINE qepy_set_extkin(vin, gather)
++      ! xcSolidsBench tau hook: set the external tau potential (d e_xc / d tau_sigma, per spin, dimensionless),
++      ! a copy of qepy_set_extpot for embed%extkin
++      USE kinds,                ONLY : DP
++      USE fft_base,             ONLY : dfftp
++      USE lsda_mod,             ONLY : nspin
++      USE mp,                   ONLY : mp_bcast
++      !
++      IMPLICIT NONE
++      REAL(DP), INTENT(IN) :: vin(:,:)
++      LOGICAL,INTENT(in),OPTIONAL :: gather
++      !
++      INTEGER :: ispin, ns
++      LOGICAL :: gather_
++      !
++      gather_ = .true.
++      IF ( present(gather) ) gather_ = gather
++      !
++      call embed%allocate_extkin()
++      !
++      ns = size(vin,2)
++      CALL mp_bcast(ns, dfftp%root, dfftp%comm)
++      !
++      call qepy_get_value(vin(:,1:ns), embed%extkin(:,1:ns), scatter = gather_)
++      !
++      DO ispin = ns+1, nspin
++         embed%extkin(:,ispin) = embed%extkin(:,1)
++      END DO
++      !
++   END SUBROUTINE
++
++   SUBROUTINE qepy_set_tau(tau, gather)
++      ! xcSolidsBench: set rho%kin_r (QE convention: sum_i w_i |grad psi_i|^2, per spin up/down) and rho%kin_g,
++      ! a copy of qepy_set_rho for the kinetic energy density (no total/magnetization conversion: kin is per spin)
++      USE kinds,                ONLY : DP
++      USE fft_rho,              ONLY : rho_r2g
++      USE fft_base,             ONLY : dfftp
++      USE scf,                  ONLY : rho
++      USE xc_lib,               ONLY : xclib_dft_is
++      !
++      IMPLICIT NONE
++      REAL(DP), INTENT(IN) :: tau(:,:)
++      LOGICAL,INTENT(in),OPTIONAL :: gather
++      !
++      LOGICAL :: gather_
++      !
++      gather_ = .true.
++      IF ( present(gather) ) gather_ = gather
++      !
++      IF (.NOT. xclib_dft_is('meta')) CALL errore('qepy_set_tau', 'not a meta run: rho%kin is not allocated', 1)
++      call qepy_get_value(tau, rho%kin_r, scatter = gather_)
++      CALL rho_r2g(dfftp, rho%kin_r, rho%kin_g )
++   END SUBROUTINE
++
+    FUNCTION qepy_get_grid(nr, gather) RESULT( nrw )
+       USE kinds,                ONLY : DP
+       USE fft_base,             ONLY : dfftp
+diff --git a/src/pw/qepy_v_of_rho.f90 b/src/pw/qepy_v_of_rho.f90
+index 9cc95e8..dd0fe7a 100644
+--- a/src/pw/qepy_v_of_rho.f90
++++ b/src/pw/qepy_v_of_rho.f90
+@@ -82,6 +82,8 @@ SUBROUTINE qepy_v_of_rho( rho, rho_core, rhog_core, tau_core, &
+ !qepy -->
+   else
+   v%of_r(:,:) = 0.0
++  ! xcSolidsBench tau hook: no stale tau potential when QE's XC is off
++  IF (xclib_dft_is('meta')) v%kin_r(:,:) = 0.0
+   etxc = 0.0
+   end if
+ !qepy <--
+diff --git a/src/pw/qepy_v_of_rho_all.f90 b/src/pw/qepy_v_of_rho_all.f90
+index 0636181..d8ca9ab 100644
+--- a/src/pw/qepy_v_of_rho_all.f90
++++ b/src/pw/qepy_v_of_rho_all.f90
+@@ -80,6 +80,12 @@ SUBROUTINE qepy_v_of_rho_all( rho, rho_core, rhog_core, tau_core, &
+ !qepy --> 
+   ! add extpot
+   IF (ALLOCATED(embed%extpot)) v%of_r = v%of_r + embed%extpot
++  ! xcSolidsBench tau hook: add the external tau potential (per spin) to v%kin_r
++  IF (ALLOCATED(embed%extkin)) THEN
++     IF (.NOT. xclib_dft_is('meta')) CALL errore('qepy_v_of_rho_all', &
++        'extkin set but the run is not meta (no tau, no kedtau): use a meta input_dft', 1)
++     v%kin_r = v%kin_r + embed%extkin
++  ENDIF
+ !qepy <-- 
+      ! ... define the total local potential (external + scf)
+      !
