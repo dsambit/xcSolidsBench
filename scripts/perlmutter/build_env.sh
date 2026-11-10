@@ -7,6 +7,7 @@
 set -euo pipefail
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 source "$REPO/scripts/perlmutter/env_xcsb.sh"
+set -euo pipefail
 LOGS=$XCSB_BUILD/logs; mkdir -p "$LOGS"
 NP=${NP:-32}
 PHASES=${*:-env qe qepy check}
@@ -30,7 +31,8 @@ phase_qe() {
   set +u; conda activate "$XCSB_ENV"; set -u
   cd "$XCSB_QE"
   [ "$(git rev-parse HEAD)" = 9f93ddec427d2b9a45bb72d828c6d324f62fcabd ] || { echo "QE tree is not qe-7.6 (9f93ddec)"; exit 1; }
-  export CFLAGS="-O2 -fPIC" FFLAGS="-O2 -fPIC" try_foxflags="-fPIC"
+  # QE's own gfortran defaults (install/m4/x_ac_qe_f90.m4: -O3 -g, -fallow-argument-mismatch for gfortran >= 10) + -fPIC
+  export CFLAGS="-O3 -fPIC" FFLAGS="-O3 -g -fPIC -fallow-argument-mismatch" try_foxflags="-fPIC"
   export BLAS_LIBS="-L${CRAY_LIBSCI_PREFIX_DIR}/lib -lsci_gnu_mp" LAPACK_LIBS="-L${CRAY_LIBSCI_PREFIX_DIR}/lib -lsci_gnu_mp"
   export FFT_LIBS="-L${FFTW_DIR} -lfftw3_omp -lfftw3"
   ./configure MPIF90=ftn F90=ftn CC=cc --enable-openmp --with-scalapack=no
@@ -50,7 +52,7 @@ phase_qepy() {
   else
     git apply "$REPO/patches/qepy-qe76-tau-hook.patch"
   fi
-  export qedir="$XCSB_QE" CFLAGS="-O2 -fPIC" FFLAGS="-O2 -fPIC" MAKEFLAGS="-j8"
+  export qedir="$XCSB_QE" CFLAGS="-O3 -fPIC" FFLAGS="-O3 -g -fPIC -fallow-argument-mismatch" MAKEFLAGS="-j8"
   python -m pip install --no-build-isolation -v . 2>&1 | tail -200
   stamp qepy
 }

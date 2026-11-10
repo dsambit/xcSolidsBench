@@ -12,12 +12,13 @@ export XCSB_PSEUDO_DIR=$W/pseudo/sg15-1.2
 export JAX_COMPILATION_CACHE_DIR=$W/cache/jax
 export JAX_ENABLE_X64=1
 mkdir -p $HOME $TMPDIR $XDG_CACHE_HOME $CONDA_PKGS_DIRS $JAX_COMPILATION_CACHE_DIR
-# module and conda scripts are not 'set -eu' clean: relax the caller's shell options while loading
-_xcsb_opts=$(set +o); set +eu
+# module and conda scripts are not 'set -eu' clean: relax the caller's -e/-u while loading, then restore them
+# ($- is read directly: a command substitution would not see -e)
+_xcsb_flags=$-; set +eu
 module load cpu >/dev/null 2>&1                 # CPU target (login nodes default to the GPU stack)
 module load PrgEnv-gnu >/dev/null 2>&1
 module load cray-fftw cray-libsci >/dev/null 2>&1
 module load conda >/dev/null 2>&1
 eval "$(conda shell.bash hook)"
 if [ -d "$XCSB_ENV" ]; then conda activate "$XCSB_ENV"; fi
-eval "$_xcsb_opts"; unset _xcsb_opts
+case $_xcsb_flags in *e*) set -e;; esac; case $_xcsb_flags in *u*) set -u;; esac; unset _xcsb_flags
