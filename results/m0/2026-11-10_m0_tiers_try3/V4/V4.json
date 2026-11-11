@@ -1,0 +1,18 @@
+{
+ "tolerance_ry": 1e-08,
+ "cases": {
+  "PBE": {
+   "pass": false,
+   "nspin1": "failed",
+   "nspin2": "ok"
+  },
+  "r2SCAN": {
+   "etot_nspin1": -15.75481926942581,
+   "etot_nspin2": -15.754819269437405,
+   "d_etot": 1.1596057447604835e-11,
+   "mag_abs_nspin2": 2.293779713041152e-12,
+   "pass": true
+  }
+ },
+ "pass": false
+}

@@ -1,0 +1,200 @@
+{
+ "tolerances": {
+  "etot_ry_per_atom": 1e-05,
+  "eig_ry": 1e-05,
+  "mag_muB": 0.0001,
+  "exc_rel": 1e-06
+ },
+ "cases": {
+  "Si/PBE": {
+   "etot_native": -15.750955196645663,
+   "etot_hooked": -15.750953584808034,
+   "d_etot_per_atom": 8.05918814350548e-07,
+   "d_eig_max": 2.1097967031757925e-06,
+   "d_eig_max_all_bands": 2.1097967031757925e-06,
+   "mag_native": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "mag_hooked": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "spin_flipped": false,
+   "d_mag_total": 0.0,
+   "d_mag_abs": 0.0,
+   "iterations_hooked": 15,
+   "pass": true,
+   "host_check": {
+    "qe_etxc": -4.826016153848591,
+    "host_minus_qe": 1.611824787417504e-06,
+    "qe_threshold_points": 0,
+    "host_exc_at_threshold_points": 0.0,
+    "residual": 1.611824787417504e-06,
+    "residual_rel": 3.3398661256699817e-07,
+    "pass": true
+   }
+  },
+  "Fe/PBE": {
+   "etot_native": -236.70595948987406,
+   "etot_hooked": -236.70595381456016,
+   "d_etot_per_atom": 5.67531390061049e-06,
+   "d_eig_max": 3.061715923902142e-06,
+   "d_eig_max_all_bands": 0.003416427191999194,
+   "mag_native": {
+    "total": 2.380536819928456,
+    "absolute": 2.5403078851197405
+   },
+   "mag_hooked": {
+    "total": -2.3805426788006,
+    "absolute": 2.5403249900885294
+   },
+   "spin_flipped": true,
+   "d_mag_total": 5.8588721438823654e-06,
+   "d_mag_abs": 1.7104968788927977e-05,
+   "iterations_hooked": 18,
+   "pass": true,
+   "host_check": {
+    "qe_etxc": -25.119249227007522,
+    "host_minus_qe": 5.675238011093597e-06,
+    "qe_threshold_points": 0,
+    "host_exc_at_threshold_points": 0.0,
+    "residual": 5.675238011093597e-06,
+    "residual_rel": 2.2593183258804321e-07,
+    "pass": true
+   }
+  },
+  "Si-lowsym/TPSS": {
+   "etot_native": -15.69884473498573,
+   "etot_hooked": -15.69884281927698,
+   "d_etot_per_atom": 9.578543753718805e-07,
+   "d_eig_max": 4.057474072283185e-07,
+   "d_eig_max_all_bands": 4.057474072283185e-07,
+   "mag_native": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "mag_hooked": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "spin_flipped": false,
+   "d_mag_total": 0.0,
+   "d_mag_abs": 0.0,
+   "iterations_hooked": 1,
+   "pass": true,
+   "host_check": {
+    "qe_etxc": -4.816551281134538,
+    "host_minus_qe": 1.915710062583287e-06,
+    "qe_threshold_points": 0,
+    "host_exc_at_threshold_points": 0.0,
+    "residual": 1.915710062583287e-06,
+    "residual_rel": 3.9773480043423133e-07,
+    "pass": true
+   }
+  },
+  "Fe-offset/TPSS": {
+   "etot_native": -236.60239581146698,
+   "etot_hooked": -236.60238870303579,
+   "d_etot_per_atom": 7.108431191227282e-06,
+   "d_eig_max": 4.08131909920284e-05,
+   "d_eig_max_all_bands": 0.028964742583016623,
+   "mag_native": {
+    "total": -2.6511015955286155,
+    "absolute": 2.7606908755400728
+   },
+   "mag_hooked": {
+    "total": -2.6514308351275173,
+    "absolute": 2.760843467541684
+   },
+   "spin_flipped": false,
+   "d_mag_total": 0.0003292395989018537,
+   "d_mag_abs": 0.0001525920016112181,
+   "iterations_hooked": 8,
+   "pass": false,
+   "host_check": {
+    "qe_etxc": -25.04299259205074,
+    "host_minus_qe": 7.1122978368975964e-06,
+    "qe_threshold_points": 0,
+    "host_exc_at_threshold_points": 0.0,
+    "residual": 7.1122978368975964e-06,
+    "residual_rel": 2.8400351159131093e-07,
+    "pass": true
+   }
+  },
+  "Si-lowsym/PBE/host_exc": {
+   "qe_etxc": -4.826226548509721,
+   "host_minus_qe": 1.608445086453969e-06,
+   "qe_threshold_points": 0,
+   "host_exc_at_threshold_points": 0.0,
+   "residual": 1.608445086453969e-06,
+   "residual_rel": 3.3327177460217583e-07,
+   "pass": true
+  }
+ },
+ "diagnostics": {
+  "Si/TPSS": {
+   "etot_native": -15.728402087753569,
+   "etot_hooked": -15.730730316247861,
+   "d_etot_per_atom": 0.0011641142471461308,
+   "d_eig_max": 0.0005353608522850051,
+   "d_eig_max_all_bands": 0.0005353608522850051,
+   "mag_native": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "mag_hooked": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "spin_flipped": false,
+   "d_mag_total": 0.0,
+   "d_mag_abs": 0.0,
+   "iterations_hooked": 13,
+   "pass": false,
+   "host_check": {
+    "qe_etxc": -4.810507629252994,
+    "host_minus_qe": -0.0023210889403575408,
+    "qe_threshold_points": 12,
+    "host_exc_at_threshold_points": -0.002322986689338045,
+    "residual": 1.8977489805041894e-06,
+    "residual_rel": 3.945007734659562e-07,
+    "pass": true
+   },
+   "note": "not a pass criterion: QE's native meta-GGA sets e_xc = 0 at grid points with |grad rho|^2 <= 1e-24 (centres of symmetry); the host check removes exactly those points"
+  },
+  "Fe/TPSS": {
+   "etot_native": -236.58917418231613,
+   "etot_hooked": -236.60485678351318,
+   "d_etot_per_atom": 0.015682601197056556,
+   "d_eig_max": 0.008730747253416382,
+   "d_eig_max_all_bands": 0.008730747253416382,
+   "mag_native": {
+    "total": -2.5372953736056054,
+    "absolute": 2.718917180996695
+   },
+   "mag_hooked": {
+    "total": -2.537466028312462,
+    "absolute": 2.718731925263163
+   },
+   "spin_flipped": false,
+   "d_mag_total": 0.00017065470685651007,
+   "d_mag_abs": 0.00018525573353223024,
+   "iterations_hooked": 15,
+   "pass": false,
+   "host_check": {
+    "qe_etxc": -25.00947732954446,
+    "host_minus_qe": -0.01565474738544026,
+    "qe_threshold_points": 14,
+    "host_exc_at_threshold_points": -0.015661850854754272,
+    "residual": 7.103469314012623e-06,
+    "residual_rel": 2.840310983077234e-07,
+    "pass": true
+   },
+   "note": "not a pass criterion: QE's native meta-GGA sets e_xc = 0 at grid points with |grad rho|^2 <= 1e-24 (centres of symmetry); the host check removes exactly those points"
+  }
+ },
+ "pass": false,
+ "diagnostics_host_check_pass": true,
+ "recomputed": "laptop, xcsb 72d70d9+ compare_v3 (occupied-band eigenvalues), from the records of this run"
+}

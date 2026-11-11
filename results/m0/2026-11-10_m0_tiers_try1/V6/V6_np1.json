@@ -1,0 +1,22 @@
+{
+ "ranks": 1,
+ "cases": {
+  "Si/PBE": {
+   "status": "ok",
+   "iterations": 9,
+   "etot_ry": -15.750953584804629,
+   "magnetization": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "seconds": 58.54575848579407,
+   "t_hook_mean_s": 0.02922434277004666,
+   "t_iter_mean_s": 5.715643882751465,
+   "min_rho": [
+    0.0006201466026780371,
+    0.0006201466026780371
+   ]
+  }
+ },
+ "pass": true
+}

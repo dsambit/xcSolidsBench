@@ -1,0 +1,86 @@
+{
+ "ranks": 8,
+ "cases": {
+  "Si/PBE": {
+   "status": "ok",
+   "iterations": 10,
+   "etot_ry": -15.750953584793631,
+   "magnetization": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "seconds": 7.663780212402344,
+   "t_hook_mean_s": 0.03666799068450928,
+   "t_iter_mean_s": 0.645366621017456,
+   "min_rho": [
+    0.000619956234124348,
+    0.000619956234124348
+   ]
+  },
+  "Si/r2SCAN": {
+   "status": "ok",
+   "iterations": 11,
+   "etot_ry": -15.754819269452655,
+   "magnetization": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "seconds": 7.1727869510650635,
+   "t_hook_mean_s": 0.03695828264409846,
+   "t_iter_mean_s": 0.6309393102472479,
+   "min_rho": [
+    0.0007537263116936619,
+    0.0007537263116936619
+   ]
+  },
+  "Si/SCH-SI-A:v3.1": {
+   "status": "ok",
+   "iterations": 12,
+   "etot_ry": -15.81188565523117,
+   "magnetization": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "seconds": 83.79249882698059,
+   "t_hook_mean_s": 5.923939526081085,
+   "t_iter_mean_s": 6.522492567698161,
+   "min_rho": [
+    0.0008520243410645445,
+    0.0008520243410645445
+   ]
+  },
+  "Si/SCH-SI-B:v3.1": {
+   "status": "ok",
+   "iterations": 12,
+   "etot_ry": -15.7941623722785,
+   "magnetization": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "seconds": 82.06899499893188,
+   "t_hook_mean_s": 5.829499403635661,
+   "t_iter_mean_s": 6.435332576433818,
+   "min_rho": [
+    0.0007846885464050969,
+    0.0007846885464050969
+   ]
+  },
+  "Fe/PBE": {
+   "status": "failed",
+   "error": "NegativeDensityError: negative spin density at 5938 grid points: min -9.019e-02, integrated negative charge 8.545e-01"
+  },
+  "Fe/r2SCAN": {
+   "status": "failed",
+   "error": "NegativeDensityError: negative spin density at 5938 grid points: min -9.019e-02, integrated negative charge 8.545e-01"
+  },
+  "Fe/SCH-SI-A:v3.1": {
+   "status": "failed",
+   "error": "NegativeDensityError: negative spin density at 5938 grid points: min -9.019e-02, integrated negative charge 8.545e-01"
+  },
+  "Fe/SCH-SI-B:v3.1": {
+   "status": "failed",
+   "error": "NegativeDensityError: negative spin density at 5938 grid points: min -9.019e-02, integrated negative charge 8.545e-01"
+  }
+ },
+ "pass": false
+}

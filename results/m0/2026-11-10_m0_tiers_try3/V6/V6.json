@@ -1,0 +1,133 @@
+{
+ "cases": {
+  "Fe__hooked__PBE": {
+   "status": "ok",
+   "iterations": 32,
+   "etot_ry": -236.70421281402673,
+   "magnetization": {
+    "total": -2.3157022883350793,
+    "absolute": 2.490387248523068
+   },
+   "seconds": 278.5775828361511,
+   "t_hook_mean_s": 0.01718122512102127,
+   "t_iter_mean_s": 8.534365497529507,
+   "min_rho": [
+    0.01922361227524845,
+    0.015328646528762657
+   ],
+   "frac_tau_below_tauW": [
+    0.0,
+    0.0
+   ]
+  },
+  "Fe__hooked__SCH-SI-A_v3.1": {
+   "status": "ok",
+   "iterations": 65,
+   "etot_ry": -236.84770807506888,
+   "magnetization": {
+    "total": -2.7850189353883996,
+    "absolute": 3.1183856893471504
+   },
+   "seconds": 868.4595744609833,
+   "t_hook_mean_s": 4.804883381036611,
+   "t_iter_mean_s": 13.19287405014038,
+   "min_rho": [
+    0.021123316490086703,
+    0.014726049964364284
+   ],
+   "frac_tau_below_tauW": [
+    0.0,
+    0.0
+   ]
+  },
+  "Fe__hooked__SCH-SI-B_v3.1": {
+   "status": "running",
+   "error": null
+  },
+  "Fe__hooked__r2SCAN": {
+   "status": "ok",
+   "iterations": 31,
+   "etot_ry": -236.7197883936391,
+   "magnetization": {
+    "total": -2.800279234521597,
+    "absolute": 3.166454908424864
+   },
+   "seconds": 261.7729172706604,
+   "t_hook_mean_s": 0.018760711916031375,
+   "t_iter_mean_s": 8.26649744279923,
+   "min_rho": [
+    0.021517576081906353,
+    0.014339740523632849
+   ],
+   "frac_tau_below_tauW": [
+    0.0,
+    0.0
+   ]
+  },
+  "Si__hooked__PBE": {
+   "status": "failed",
+   "error": "SCFError: conv_elec at iteration 15 but |dE| = 1.278522727687914e-07 > E_TOL = 1e-08"
+  },
+  "Si__hooked__SCH-SI-A_v3.1": {
+   "status": "ok",
+   "iterations": 16,
+   "etot_ry": -15.811885655411817,
+   "magnetization": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "seconds": 104.33581733703613,
+   "t_hook_mean_s": 5.585999712347984,
+   "t_iter_mean_s": 6.10832317173481,
+   "min_rho": [
+    0.0008521021426764336,
+    0.0008521021426764336
+   ],
+   "frac_tau_below_tauW": [
+    0.0,
+    0.0
+   ]
+  },
+  "Si__hooked__SCH-SI-B_v3.1": {
+   "status": "ok",
+   "iterations": 18,
+   "etot_ry": -15.794162372802067,
+   "magnetization": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "seconds": 114.67191410064697,
+   "t_hook_mean_s": 5.484762496418423,
+   "t_iter_mean_s": 6.010366241137187,
+   "min_rho": [
+    0.0007847526813018514,
+    0.0007847526813018514
+   ],
+   "frac_tau_below_tauW": [
+    0.0,
+    0.0
+   ]
+  },
+  "Si__hooked__r2SCAN": {
+   "status": "ok",
+   "iterations": 12,
+   "etot_ry": -15.754819269425813,
+   "magnetization": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "seconds": 8.569633722305298,
+   "t_hook_mean_s": 0.03590575853983561,
+   "t_iter_mean_s": 0.6053547859191895,
+   "min_rho": [
+    0.0007537126633428278,
+    0.0007537126633428278
+   ],
+   "frac_tau_below_tauW": [
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "pass": false
+}

@@ -1,0 +1,29 @@
+{
+ "ranks": 8,
+ "npts": 13728,
+ "chunk": 4096,
+ "cases": {
+  "model:test": {
+   "bitwise_equal": true,
+   "e_xc": -36.32403969365527,
+   "d_e_xc": 0.0,
+   "max_dv": 0.0,
+   "t_parallel_s": 0.37111639976501465
+  },
+  "r2SCAN": {
+   "bitwise_equal": true,
+   "e_xc": -42.89519800328893,
+   "d_e_xc": 0.0,
+   "max_dv": 0.0,
+   "t_parallel_s": 0.032540321350097656
+  },
+  "SCH-SI-A:v3.1": {
+   "bitwise_equal": true,
+   "e_xc": -40.64012757490021,
+   "d_e_xc": 0.0,
+   "max_dv": 0.0,
+   "t_parallel_s": 16.59523105621338
+  }
+ },
+ "pass": true
+}

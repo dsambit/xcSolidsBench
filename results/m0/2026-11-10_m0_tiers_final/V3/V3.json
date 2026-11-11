@@ -1,0 +1,126 @@
+{
+ "tolerances": {
+  "etot_ry_per_atom": 1e-05,
+  "eig_ry": 1e-05,
+  "mag_muB": 0.0001,
+  "exc_rel": 1e-06
+ },
+ "cases": {
+  "Si/PBE": {
+   "etot_native": -15.75095519664563,
+   "etot_hooked": -15.75095358378675,
+   "d_etot_per_atom": 8.064294405585315e-07,
+   "d_eig_max": 4.3506617360966615e-06,
+   "mag_native": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "mag_hooked": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "spin_flipped": false,
+   "d_mag_total": 0.0,
+   "d_mag_abs": 0.0,
+   "iterations_hooked": 15,
+   "pass": true,
+   "host_check": {
+    "qe_etxc": -4.826016153848052,
+    "host_minus_qe": 1.6118247687657572e-06,
+    "qe_threshold_points": 0,
+    "host_exc_at_threshold_points": 0.0,
+    "residual": 1.6118247687657572e-06,
+    "residual_rel": 3.339866087022024e-07,
+    "pass": true
+   }
+  },
+  "Fe/PBE": {
+   "pass": false,
+   "native": "ok",
+   "hooked": "failed",
+   "error": "NegativeDensityError: negative spin density at 1275 grid points: min -2.337e-04, integrated negative charge 5.255e-04"
+  },
+  "Si-lowsym/TPSS": {
+   "etot_native": -15.69884473498573,
+   "etot_hooked": -15.698842819145963,
+   "d_etot_per_atom": 9.579198838594039e-07,
+   "d_eig_max": 3.23747597175128e-07,
+   "mag_native": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "mag_hooked": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "spin_flipped": false,
+   "d_mag_total": 0.0,
+   "d_mag_abs": 0.0,
+   "iterations_hooked": 14,
+   "pass": true,
+   "host_check": {
+    "qe_etxc": -4.816551281134747,
+    "host_minus_qe": 1.915710067024179e-06,
+    "qe_threshold_points": 0,
+    "host_exc_at_threshold_points": 0.0,
+    "residual": 1.915710067024179e-06,
+    "residual_rel": 3.977348013562207e-07,
+    "pass": true
+   }
+  },
+  "Fe-offset/TPSS": {
+   "pass": false,
+   "native": "ok",
+   "hooked": "failed",
+   "error": "NegativeDensityError: negative spin density at 14330 grid points: min -1.118e-02, integrated negative charge 5.436e-01"
+  },
+  "Si-lowsym/PBE/host_exc": {
+   "qe_etxc": -4.826226548509721,
+   "host_minus_qe": 1.608445086453969e-06,
+   "qe_threshold_points": 0,
+   "host_exc_at_threshold_points": 0.0,
+   "residual": 1.608445086453969e-06,
+   "residual_rel": 3.3327177460217583e-07,
+   "pass": true
+  }
+ },
+ "diagnostics": {
+  "Si/TPSS": {
+   "etot_native": -15.728402087753542,
+   "etot_hooked": -15.730730316210307,
+   "d_etot_per_atom": 0.0011641142283824735,
+   "d_eig_max": 0.000535155568080703,
+   "mag_native": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "mag_hooked": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "spin_flipped": false,
+   "d_mag_total": 0.0,
+   "d_mag_abs": 0.0,
+   "iterations_hooked": 12,
+   "pass": false,
+   "host_check": {
+    "qe_etxc": -4.810507629269118,
+    "host_minus_qe": -0.0023210889403806334,
+    "qe_threshold_points": 12,
+    "host_exc_at_threshold_points": -0.002322986689359218,
+    "residual": 1.897748978584718e-06,
+    "residual_rel": 3.945007730656175e-07,
+    "pass": true
+   },
+   "note": "not a pass criterion: QE's native meta-GGA sets e_xc = 0 at grid points with |grad rho|^2 <= 1e-24 (centres of symmetry); the host check removes exactly those points"
+  },
+  "Fe/TPSS": {
+   "pass": false,
+   "native": "ok",
+   "hooked": "running",
+   "error": null
+  }
+ },
+ "pass": false,
+ "diagnostics_host_check_pass": false
+}

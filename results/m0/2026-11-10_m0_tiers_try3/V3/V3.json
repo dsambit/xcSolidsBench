@@ -1,0 +1,89 @@
+{
+ "tolerances": {
+  "etot_ry_per_atom": 1e-05,
+  "eig_ry": 1e-05,
+  "mag_muB": 0.0001,
+  "exc_rel": 1e-06
+ },
+ "cases": {
+  "Si/PBE": {
+   "pass": false,
+   "native": "ok",
+   "hooked": "failed",
+   "error": "SCFError: conv_elec at iteration 15 but |dE| = 1.278522727687914e-07 > E_TOL = 1e-08"
+  },
+  "Si/TPSS": {
+   "etot_native": -15.728402087753542,
+   "etot_hooked": -15.730730316210314,
+   "d_etot_per_atom": 0.0011641142283860262,
+   "d_eig_max": 0.0005351555826477172,
+   "mag_native": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "mag_hooked": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "d_mag_total": 0.0,
+   "d_mag_abs": 0.0,
+   "iterations_hooked": 12,
+   "pass": false,
+   "host_exc_minus_qe_etxc_ry": -0.002321088940378857,
+   "host_exc_rel": 0.0004825039516120175
+  },
+  "Fe/PBE": {
+   "etot_native": -236.7042184924549,
+   "etot_hooked": -236.70421281402668,
+   "d_etot_per_atom": 5.678428237843036e-06,
+   "d_eig_max": 0.2307098638652043,
+   "mag_native": {
+    "total": 2.315724048025836,
+    "absolute": 2.490411128500523
+   },
+   "mag_hooked": {
+    "total": -2.315702287206758,
+    "absolute": 2.490387249851006
+   },
+   "d_mag_total": 4.631426335232594,
+   "d_mag_abs": 2.3878649517250494e-05,
+   "iterations_hooked": 32,
+   "pass": false,
+   "host_exc_minus_qe_etxc_ry": 5.676595279169305e-06,
+   "host_exc_rel": 2.2606988664051644e-07
+  },
+  "Fe/TPSS": {
+   "etot_native": -236.58734210300344,
+   "etot_hooked": -236.60302483728884,
+   "d_etot_per_atom": 0.015682734285405786,
+   "d_eig_max": 0.03164634042568126,
+   "mag_native": {
+    "total": -2.5808519908671967,
+    "absolute": 2.7760033209512045
+   },
+   "mag_hooked": {
+    "total": -2.580913892710278,
+    "absolute": 2.775798477909985
+   },
+   "d_mag_total": 6.190184308119129e-05,
+   "d_mag_abs": 0.0002048430412195934,
+   "iterations_hooked": 27,
+   "pass": false,
+   "host_exc_minus_qe_etxc_ry": -0.015654907264430307,
+   "host_exc_rel": 0.0006257974601128147
+  },
+  "Si-lowsym/PBE/host_exc": {
+   "qe_etxc": -4.826226548509721,
+   "host_minus_qe": 1.6084450855657906e-06,
+   "rel": 3.332717744181442e-07,
+   "pass": true
+  },
+  "Si-lowsym/TPSS/host_exc": {
+   "qe_etxc": -4.816551281134725,
+   "host_minus_qe": 1.915710067024179e-06,
+   "rel": 3.977348013562225e-07,
+   "pass": true
+  }
+ },
+ "pass": false
+}

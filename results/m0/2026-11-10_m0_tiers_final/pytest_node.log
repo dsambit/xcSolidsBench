@@ -1,0 +1,10 @@
+......                                                                   [100%]
+==================================== PASSES ====================================
+=========================== short test summary info ============================
+PASSED tests/test_v1_adapters.py::test_xchole_sanity_points[A]
+PASSED tests/test_v1_adapters.py::test_xchole_sanity_points[B]
+PASSED tests/test_v2_potential_fd.py::test_potential_fd_xchole[SCH-SI-A:v3.1]
+PASSED tests/test_v2_potential_fd.py::test_potential_fd_xchole[SCH-SI-B:v3.1]
+PASSED tests/test_v2b_orbital_fd.py::test_orbital_rotation_xchole[SCH-SI-A:v3.1]
+PASSED tests/test_v2b_orbital_fd.py::test_orbital_rotation_xchole[SCH-SI-B:v3.1]
+6 passed, 56 deselected in 852.70s (0:14:12)

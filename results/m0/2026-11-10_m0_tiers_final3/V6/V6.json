@@ -1,0 +1,165 @@
+{
+ "cases": {
+  "Fe__hooked__PBE": {
+   "status": "ok",
+   "iterations": 18,
+   "etot_ry": -236.7059538154008,
+   "magnetization": {
+    "total": -2.3805304191859884,
+    "absolute": 2.540302979876264
+   },
+   "seconds": 430.6581025123596,
+   "t_hook_mean_s": 0.016251974635654025,
+   "t_iter_mean_s": 13.770078791512383,
+   "min_rho": [
+    0.019123059350270387,
+    0.015403419809448527
+   ],
+   "frac_tau_below_tauW": [
+    0.0,
+    0.0
+   ]
+  },
+  "Fe__hooked__SCH-SI-A_v3.1": {
+   "status": "ok",
+   "iterations": 20,
+   "etot_ry": -236.84895261728082,
+   "magnetization": {
+    "total": -2.767870390473565,
+    "absolute": 3.10096007557561
+   },
+   "seconds": 578.8785560131073,
+   "t_hook_mean_s": 5.369060683250427,
+   "t_iter_mean_s": 19.593784642219543,
+   "min_rho": [
+    0.021082310732541142,
+    0.014705716166233292
+   ],
+   "frac_tau_below_tauW": [
+    0.0,
+    0.0
+   ]
+  },
+  "Fe__hooked__SCH-SI-B_v3.1": {
+   "status": "ok",
+   "iterations": 43,
+   "etot_ry": -236.7984649832405,
+   "magnetization": {
+    "total": -2.7465691226537676,
+    "absolute": 2.9379635374311674
+   },
+   "seconds": 1020.8880159854889,
+   "t_hook_mean_s": 4.937999924948049,
+   "t_iter_mean_s": 19.38434998933659,
+   "min_rho": [
+    0.019935532612565858,
+    0.015518238909903836
+   ],
+   "frac_tau_below_tauW": [
+    0.0,
+    0.0
+   ]
+  },
+  "Fe__hooked__r2SCAN": {
+   "status": "ok",
+   "iterations": 22,
+   "etot_ry": -236.72082487208743,
+   "magnetization": {
+    "total": -2.7810820872916624,
+    "absolute": 3.1496713756350054
+   },
+   "seconds": 504.55360317230225,
+   "t_hook_mean_s": 0.01865000074559992,
+   "t_iter_mean_s": 14.700271985747598,
+   "min_rho": [
+    0.021498664484207466,
+    0.014306723164084607
+   ],
+   "frac_tau_below_tauW": [
+    0.0,
+    0.0
+   ]
+  },
+  "Si__hooked__PBE": {
+   "status": "ok",
+   "iterations": 15,
+   "etot_ry": -15.750953584808059,
+   "magnetization": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "seconds": 30.248064279556274,
+   "t_hook_mean_s": 0.03048712412516276,
+   "t_iter_mean_s": 0.9071966965993246,
+   "min_rho": [
+    0.0006206903261553268,
+    0.0006206903261553268
+   ],
+   "frac_tau_below_tauW": [
+    0.0,
+    0.0
+   ]
+  },
+  "Si__hooked__SCH-SI-A_v3.1": {
+   "status": "ok",
+   "iterations": 19,
+   "etot_ry": -15.811885654727833,
+   "magnetization": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "seconds": 147.50985074043274,
+   "t_hook_mean_s": 5.465437148746691,
+   "t_iter_mean_s": 6.574735892446418,
+   "min_rho": [
+    0.00085219534644187,
+    0.00085219534644187
+   ],
+   "frac_tau_below_tauW": [
+    0.0,
+    0.0
+   ]
+  },
+  "Si__hooked__SCH-SI-B_v3.1": {
+   "status": "ok",
+   "iterations": 16,
+   "etot_ry": -15.794162374742776,
+   "magnetization": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "seconds": 128.29311513900757,
+   "t_hook_mean_s": 5.5845387279987335,
+   "t_iter_mean_s": 6.646412506699562,
+   "min_rho": [
+    0.0007841975970371813,
+    0.0007841975970371813
+   ],
+   "frac_tau_below_tauW": [
+    0.0,
+    0.0
+   ]
+  },
+  "Si__hooked__r2SCAN": {
+   "status": "ok",
+   "iterations": 16,
+   "etot_ry": -15.754819269434275,
+   "magnetization": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "seconds": 31.118349313735962,
+   "t_hook_mean_s": 0.03640025854110718,
+   "t_iter_mean_s": 0.9019127041101456,
+   "min_rho": [
+    0.0007539463363124008,
+    0.0007539463363124008
+   ],
+   "frac_tau_below_tauW": [
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "pass": true
+}

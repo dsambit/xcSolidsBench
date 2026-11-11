@@ -1,0 +1,25 @@
+{
+ "cases": {
+  "Si__hooked__PBE": {
+   "status": "ok",
+   "iterations": 26,
+   "etot_ry": -15.750953584835589,
+   "magnetization": {
+    "total": 0.0,
+    "absolute": 0.0
+   },
+   "seconds": 116.52583408355713,
+   "t_hook_mean_s": 0.027738075989943285,
+   "t_iter_mean_s": 4.160962499105013,
+   "min_rho": [
+    0.0006199830602221746,
+    0.0006199830602221746
+   ],
+   "frac_tau_below_tauW": [
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "pass": true
+}
