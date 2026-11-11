@@ -291,7 +291,7 @@ end: final hook on the converged density; record
 failure (MAXITER, negative ρ_σ, NaN, any QE error): raise; the record is written with status "failed" and the history
 ```
 
-- Global settings, the same for every system and functional (`scf/settings.py`, recorded in every result): conv_thr, E_TOL,
+- Global settings, the same for every system and functional (`scf/settings.py`, recorded in every result): conv_thr,
   MAXITER, mixing (Broyden 'plain'; beta and ndim fixed by the M1 convergence study), d = 4, Marzari-Vanderbilt cold smearing for
   every system (one rule: for gapped systems the smearing is inert once degauss ≪ gap, and it handles the cases where a functional
   closes a gap, e.g. Ge or the monoxides). Per-system physical settings (ecutwfc, k-mesh, degauss) come from the convergence
