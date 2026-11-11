@@ -40,6 +40,7 @@ def main(argv=None):
     s.add_argument("--mixing-beta", type=float, help="diagnostic: Broyden beta for this run (recorded as a deviation)")
     s.add_argument("--tag", default="", help="suffix of the run directory (e.g. beta0.1)")
     s.add_argument("--mag-split", action="store_true", help="frozen split of E_xc and its magnetization dependence by piece")
+    s.add_argument("--fsm-parts", action="store_true", help="E_x, E_c, pieces, switch means and the frozen pairing test")
     pv = sub.add_parser("prep-variant", help="re-solve and cache the norms of norm-dependent xchole variants (serial)")
     pv.add_argument("names", nargs="+")
     c = sub.add_parser("compare", help="tier verdicts from the SCF records")
@@ -60,7 +61,8 @@ def main(argv=None):
 
         from . import tiers
         out = tiers.run_dir(a.root, a.case, a.mode, a.name) + (f"__{a.tag}" if a.tag else "")
-        rec = tiers.scf(a.case, a.mode, a.name, out, a.host_check, a.payback_diag, a.maxiter, a.mixing_beta, a.mag_split)
+        rec = tiers.scf(a.case, a.mode, a.name, out, a.host_check, a.payback_diag, a.maxiter, a.mixing_beta, a.mag_split,
+                        a.fsm_parts)
         ok = MPI.COMM_WORLD.bcast(rec.get("status") == "ok", root=0)
         if MPI.COMM_WORLD.Get_rank() == 0:
             print(json.dumps({"case": a.case, "mode": a.mode, "name": a.name, "status": rec.get("status"),

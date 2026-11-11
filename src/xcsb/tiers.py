@@ -77,15 +77,23 @@ def all_cases():
     return {**CASES, **fe_payback.CASES, **fe_magnetism.CASES}
 
 
+def get_case(name):
+    """A named case; 'Fe80-fsm-<m>': bcc Fe at 80 Ry with the total magnetization fixed to m (mu_B per cell)."""
+    if name.startswith("Fe80-fsm-"):
+        from .studies.fe_magnetism import case_fe80_fsm
+        return case_fe80_fsm(float(name.split("-")[-1]))
+    return all_cases()[name]()
+
+
 def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None = None, payback_diag: bool = False,
-        maxiter: int | None = None, mixing_beta: float | None = None, mag_split: bool = False):
+        maxiter: int | None = None, mixing_beta: float | None = None, mag_split: bool = False, fsm_parts: bool = False):
     """mode 'native': QE's input_dft = name (host_check: a libxc name for the host E_xc of the native density);
     mode 'hooked': the functional `name` through the hooks. Writes <out>/record.json."""
     from mpi4py import MPI
 
     from .scf.driver import _write, run_hooked, run_native
     comm = MPI.COMM_WORLD
-    case = all_cases()[case_name]()
+    case = get_case(case_name)
     deviations = {}
     if mixing_beta is not None:                       # a labelled diagnostic deviation from the global/case beta
         deviations["mixing_beta"] = {"case": case.mixing_beta, "used": mixing_beta}
@@ -110,6 +118,10 @@ def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None =
             if mag_split:
                 from .studies.fe_magnetism import split
                 posts.append(("mag_split", lambda g, r, t: split(name, g, r, t)))
+            if fsm_parts:
+                from .studies.fe_magnetism import fsm_parts as _fp
+                posts.append(("fsm_parts", lambda g, r, t: _fp(name, g, r, t)))
+
             def run_posts(g, r, t):
                 out = {}
                 for key, fn in posts:                      # each diagnostic separately: one failure does not hide the other

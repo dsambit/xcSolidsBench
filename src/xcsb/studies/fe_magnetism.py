@@ -37,6 +37,12 @@ def case_fe80(nspin=2):
 CASES = {"Fe80": lambda: case_fe80(2)}
 
 
+def case_fe80_fsm(m):
+    """Fixed spin moment: QE's tot_magnetization = m (mu_B per cell; two Fermi levels), otherwise case_fe80."""
+    return Case(bcc("Fe", A_FE), ecutwfc=80.0, kmesh=(8, 8, 8), occupations="smearing", degauss=0.02, nspin=2,
+                starting_magnetization={"Fe": 0.5}, tot_magnetization=float(m), conv_class="bench")
+
+
 def _kernel(f):
     import jax
     import jax.numpy as jnp
@@ -56,6 +62,9 @@ def _kernel(f):
         for (r, g, t, l) in ((ru, gu, tu, lu), (rd, gd, td, ld)):
             ex_s, pc = spin_pieces(r, g, t, l, P)
             xs.append((ex_s, pc))
+        for (_, pc), sp in zip(xs, ("up", "dn")):
+            out[f"e_isox_{sp}"] = (1 - pc["gs"]) * pc["e_br"] + pc["gs"] * pc["e_sh"]
+            out[f"e_defx_{sp}"] = pc["e_def"]
         out["X_iso_BRHe"] = sum(pc["w"] * (1 - pc["gs"]) * pc["e_br"] for _, pc in xs)
         out["X_iso_shell"] = sum(pc["w"] * pc["gs"] * pc["e_sh"] for _, pc in xs)
         out["X_UEG"] = sum((1 - pc["w"]) * pc["e_def"] for _, pc in xs)
@@ -71,10 +80,10 @@ def _kernel(f):
         xu = jax_sc.payback_x(ru, gu, tu, lu, rho, P["lam"], S.get("eps_px", jax_sc.EPS_PX))
         xd = jax_sc.payback_x(rd, gd, td, ld, rho, P["lam"], S.get("eps_px", jax_sc.EPS_PX))
         c2 = jax_sc.cos2_reg(ru, rd, gu, gd)
-        w1 = w0 + (1 - w0) * S.get("ups_p", 0.0) * jax_sc.payback_gate(xu, xd, P, c2, S.get("d_cos", jax_sc.D_COS),
-                                                                       S.get("p0", jax_sc.P0_P)) \
+        pb = S.get("ups_p", 0.0) * jax_sc.payback_gate(xu, xd, P, c2, S.get("d_cos", jax_sc.D_COS), S.get("p0", jax_sc.P0_P)) \
             * jax_sc.payback_window(z, S.get("pb_zc"), S.get("pb_w"), S.get("pb_wmin", 0.0)) \
             * jax_sc.payback_rs_factor(rs, S.get("rs0", 0.0))
+        w1 = w0 + (1 - w0) * pb
         e_flat = rho * jax_sc.eps_rational(rs, z, *jax_sc.slab_B(kk, *jax_sc.hess_invariants(rh, gvn, Hu + Hd),
                                                                     jax_sc.HESS_EPS), jax_sc.KAPPA)
         q = 1 - 1 / jnp.sqrt(1 + rs / S["r_q"])
@@ -90,6 +99,7 @@ def _kernel(f):
         lam, _, wt, _ = weights(ru, rd, gu, gd, tu, td, lu, ld, Hu, Hd, P, si)
         eT = target_jax(ru, rd, gu, gd, lu, ld, Hu, Hd, wt, P, Pc, S, si)
         out["SI"] = lam * (eT - ex - ec)
+        out.update(pb=pb, e_isoc=e_iso_c, e_uegc=e_ueg, eT=eT)
         exm, ecm = exc_si(ru, rd, gu, gd, tu, td, lu, ld, Hu, Hd, P, Pc, S, si)
         out["model_total"] = exm + ecm
         out["w_x_up"], out["w_x_dn"] = xs[0][1]["w"], xs[1][1]["w"]
@@ -190,4 +200,69 @@ def descriptors(x, fm, w):
                                  "share": float(np.sum((w * m)[(d['alpha'] >= a_edges[b]) & (d['alpha'] < a_edges[b + 1])])) / M,
                                  "rho_share": float(np.sum((w * r)[(d['alpha'] >= a_edges[b]) & (d['alpha'] < a_edges[b + 1])]))
                                  / float(np.sum(w * r))} for b in range(len(a_edges) - 1)]
+    return out
+
+
+def pairing(fm, rho_up, rho_dn):
+    """Frozen pairing test on one density (per-point arrays fm from _kernel): E_xc density with the switches as in the model,
+    with the correlation switch set to the exchange switch (w_c := w_x_bar = sum_s rho_s w_x,s / rho; the payback acts on
+    top as in the model: w_c' = w + (1 - w) pb), and with the exchange switches set to the correlation switch (w_x,s := w_c).
+    Lambda' (e_T - e_x - e_c) is recomputed with each pair; e_T is unchanged."""
+    rt = np.maximum(rho_up + rho_dn, 1e-300)
+    wxu, wxd, w0, pb, lam, eT = fm["w_x_up"], fm["w_x_dn"], fm["w_c"], fm["pb"], fm["Lambda_prime"], fm["eT"]
+
+    def exc(wu, wd, wc):
+        ex = wu * fm["e_isox_up"] + (1 - wu) * fm["e_defx_up"] + wd * fm["e_isox_dn"] + (1 - wd) * fm["e_defx_dn"]
+        w1 = wc + (1 - wc) * pb
+        ec = w1 * fm["e_isoc"] + (1 - w1) * fm["e_uegc"]
+        return ex + ec + lam * (eT - ex - ec), ex, ec
+
+    wbar = (rho_up * wxu + rho_dn * wxd) / rt
+    return {"model": exc(wxu, wxd, w0), "wc_eq_wx": exc(wxu, wxd, wbar), "wx_eq_wc": exc(w0, w0, w0)}
+
+
+def fsm_parts(functional_name, grid, rho, tau):
+    """Per FSM point: E_x, E_c (clean totals, Ry), the pieces by end (indicative), |m|-weighted switch means, and for the full
+    SCH-SI sets the frozen pairing test."""
+    from ..functional import LIBXC_CODES, LibxcFunctional, get
+    from ..host.evaluate import point_inputs
+    x, _ = point_inputs(grid, rho, tau, True, True)
+    w = grid.weight
+    ry = lambda a: 2.0 * w * float(np.sum(a))          # noqa: E731
+    m = np.abs(x.rho[0] - x.rho[1])
+    M = float(np.sum(w * m))
+    out = {"functional": functional_name, "abs_magnetization": M, "total_magnetization": float(np.sum(w * (x.rho[0] - x.rho[1])))}
+    if functional_name in LIBXC_CODES:
+        xc, cc = LIBXC_CODES[functional_name].split(",")
+        out["E_x_ry"] = 2.0 * w * LibxcFunctional(functional_name + "-x", xc + ",").evaluate(x).e_sum
+        out["E_c_ry"] = 2.0 * w * LibxcFunctional(functional_name + "-c", "," + cc).evaluate(x).e_sum
+        return out
+    if functional_name.endswith("#ueg-end"):
+        import jax
+        from xchole.core import jax_model as jm
+        from xchole.sch_si import ueg_end
+        full = get(functional_name.split("#")[0])
+        Px = full._model.P
+        px, pc = ueg_end.params_P(Px), ueg_end.params_P(jm._cparams(Px))
+        exf = jax.jit(lambda r, g, l: ueg_end.ex_spin(r, g, l, px))
+        ecf = jax.jit(lambda ru, rd, gu, gd, lu, ld: ueg_end.ec(ru, rd, gu, gd, lu, ld, pc))
+        out["E_x_ry"] = ry(np.asarray(exf(x.rho[0], x.grad[0], x.lapl[0])) + np.asarray(exf(x.rho[1], x.grad[1], x.lapl[1])))
+        out["E_c_ry"] = ry(np.asarray(ecf(x.rho[0], x.rho[1], x.grad[0], x.grad[1], x.lapl[0], x.lapl[1])))
+        out["pieces_ry"] = {"X_UEG": out["E_x_ry"], "C_UEG": out["E_c_ry"]}
+        return out
+    f = get(functional_name)
+    k = _kernel(f)
+    fm = {kk: np.asarray(v) for kk, v in k(x.rho[0], x.rho[1], x.grad[0], x.grad[1], x.tau[0], x.tau[1], x.lapl[0], x.lapl[1],
+                                           x.hess[0], x.hess[1]).items()}
+    out["pieces_ry"] = {p: ry(fm[p]) for p in PIECES}
+    out["pieces_note"] = "indicative: the switch weights move with m"
+    out["E_x_ry"] = sum(out["pieces_ry"][p] for p in PIECES if p.startswith("X_"))
+    out["E_c_ry"] = sum(out["pieces_ry"][p] for p in PIECES if p.startswith("C_") or p == "SI")
+    out["E_xc_model_ry"] = ry(fm["model_total"])
+    out["m_weighted_mean"] = {kk: float(np.sum(w * m * fm[kk])) / M for kk in ("w_x_up", "w_x_dn", "w_c", "w_c_prime", "Lambda_prime")}
+    out["rho_weighted_mean"] = {kk: float(np.sum(w * (x.rho[0] + x.rho[1]) * fm[kk])) / float(np.sum(w * (x.rho[0] + x.rho[1])))
+                                for kk in ("w_x_up", "w_x_dn", "w_c")}
+    pr = pairing(fm, x.rho[0], x.rho[1])
+    out["pairing_ry"] = {kk: {"E_xc": ry(v[0]), "E_x": ry(v[1]), "E_c_base": ry(v[2])} for kk, v in pr.items()}
+    out["pairing_check_ry"] = out["pairing_ry"]["model"]["E_xc"] - out["E_xc_model_ry"]
     return out
