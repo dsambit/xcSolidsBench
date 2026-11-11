@@ -39,6 +39,9 @@ def main(argv=None):
     s.add_argument("--maxiter", type=int, help="diagnostic: MAXITER for this run (recorded as a deviation)")
     s.add_argument("--mixing-beta", type=float, help="diagnostic: Broyden beta for this run (recorded as a deviation)")
     s.add_argument("--tag", default="", help="suffix of the run directory (e.g. beta0.1)")
+    s.add_argument("--mag-split", action="store_true", help="frozen split of E_xc and its magnetization dependence by piece")
+    pv = sub.add_parser("prep-variant", help="re-solve and cache the norms of norm-dependent xchole variants (serial)")
+    pv.add_argument("names", nargs="+")
     c = sub.add_parser("compare", help="tier verdicts from the SCF records")
     c.add_argument("tier", choices=["v3", "v4", "v6"])
     c.add_argument("--root", required=True)
@@ -57,7 +60,7 @@ def main(argv=None):
 
         from . import tiers
         out = tiers.run_dir(a.root, a.case, a.mode, a.name) + (f"__{a.tag}" if a.tag else "")
-        rec = tiers.scf(a.case, a.mode, a.name, out, a.host_check, a.payback_diag, a.maxiter, a.mixing_beta)
+        rec = tiers.scf(a.case, a.mode, a.name, out, a.host_check, a.payback_diag, a.maxiter, a.mixing_beta, a.mag_split)
         ok = MPI.COMM_WORLD.bcast(rec.get("status") == "ok", root=0)
         if MPI.COMM_WORLD.Get_rank() == 0:
             print(json.dumps({"case": a.case, "mode": a.mode, "name": a.name, "status": rec.get("status"),
@@ -69,6 +72,16 @@ def main(argv=None):
         json.dump(res, open(os.path.join(a.root, f"{a.tier.upper()}.json"), "w"), indent=1, default=float)
         print(json.dumps({"tier": a.tier, "pass": res["pass"]}))
         return 0 if res["pass"] else 1
+    if a.cmd == "prep-variant":
+        from .functional.xchole import prepare_variant
+        bad = 0
+        for n in a.names:
+            try:
+                print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+            except Exception as exc:                        # out-of-range values are refused by xchole: reported, not run
+                bad += 1
+                print(json.dumps({"name": n, "refused": f"{type(exc).__name__}: {exc}"}), flush=True)
+        return 0
     if a.cmd == "payback-table":
         from .studies import fe_payback
         res = fe_payback.table(a.root)

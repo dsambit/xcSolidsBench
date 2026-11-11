@@ -68,6 +68,79 @@ def import_pinned_xchole():
     return xchole, commit
 
 
+def variant_cache_path(name: str, record_sha: str) -> str:
+    root = os.environ.get("XCSB_NORM_CACHE") or os.path.join(os.environ.get("W", "/tmp"), "cache", "xchole_norms")
+    key = hashlib.sha256(f"{XCHOLE_PIN}|{record_sha}|{name}".encode()).hexdigest()[:16]
+    return os.path.join(root, f"{name.split('@')[0].replace(':', '_')}_{key}.json")
+
+
+def prepare_variant(name: str) -> str:
+    """Re-solve the norms of a variant with norm-dependent edits through xchole's public external.load (records without
+    c1, r_q, r_q_T, kappa_T, d_hash are re-solved; m_hash removed: a modified fitted record is not the fitted model) and cache
+    the record. Raises on any violation (ranges, parameter-set fields). Returns the cache path."""
+    import copy
+    import json
+    base, edits = parse_variant(name)
+    import_pinned_xchole()
+    from xchole.sch_si import params
+    from xchole.sch_si.external import load
+    fname, sha = RECORD_SHA256[base]
+    raw = open(os.path.join(params.PARAMS_DIR, fname), "rb").read()
+    if hashlib.sha256(raw).hexdigest() != sha:
+        raise XcholePinError(f"{fname}: sha256 mismatch")
+    rec = copy.deepcopy(json.loads(raw))
+    rec["best"]["theta"].update(edits)
+    for k in ("c1", "r_q", "r_q_T", "kappa_T", "d_hash", "m_hash"):
+        rec["best"].pop(k, None)
+    solved, source = load(rec)
+    path = variant_cache_path(name, sha)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    solved = dict(solved, xcsb_variant={"name": name, "edits": edits, "norms": source.get("norms")})
+    tmp = path + ".tmp"
+    json.dump(solved, open(tmp, "w"), indent=1)
+    os.replace(tmp, path)
+    return path
+
+
+class XcholeUEGEnd(PointFunctional):
+    """The UEG-gauge end ALONE (diagnostic; name 'SCH-SI-B:v3.1#ueg-end'): both outer switches pinned at the UEG-gauge end
+    everywhere, e = sum_s e_x^UEG(rho_s, grad rho_s, lap rho_s) + e_c^UEG(rho_up, rho_dn, grad, lap), evaluated with xchole's
+    public UEG-end functions at the record's parameters exactly as the full model uses them (xchole.sch_si.ueg_end.ex_spin with
+    params_P of the exchange params, ueg_end.ec with params_P of the correlation params). No Lambda' (strong-coupling) correction,
+    no tau. Exact derivatives by JAX autodiff."""
+    uses_laplacian = True
+    uses_hessian = False
+
+    def __init__(self, name: str):
+        import jax
+        base = name.split("#")[0]
+        self.name = name
+        full = XcholeFunctional(base)
+        import_pinned_xchole()
+        from xchole.core import jax_model as jm
+        from xchole.sch_si import ueg_end
+        Px = full._model.P
+        px, pc = ueg_end.params_P(Px), ueg_end.params_P(jm._cparams(Px))
+
+        def total(ru, rd, gu, gd, lu, ld):
+            e = ueg_end.ex_spin(ru, gu, lu, px) + ueg_end.ex_spin(rd, gd, ld, px) + ueg_end.ec(ru, rd, gu, gd, lu, ld, pc)
+            return jax.numpy.sum(e)
+
+        self._vg = jax.jit(jax.value_and_grad(total, argnums=(0, 1, 2, 3, 4, 5)))
+        self._prov = dict(full.provenance, name=name, kind="xchole UEG-gauge end alone (diagnostic)", published_set=False)
+
+    @property
+    def provenance(self):
+        return dict(self._prov)
+
+    def evaluate(self, x: PointInputs) -> PointOutputs:
+        e, (dru, drd, dgu, dgd, dlu, dld) = self._vg(x.rho[0], x.rho[1], x.grad[0], x.grad[1], x.lapl[0], x.lapl[1])
+        f = lambda a: np.asarray(a, dtype=np.float64)      # noqa: E731
+        n = x.n
+        return PointOutputs(float(e), np.stack([f(dru), f(drd)]), np.stack([f(dgu), f(dgd)]), np.zeros((2, n)),
+                            np.stack([f(dlu), f(dld)]), np.zeros((2, 6, n)))
+
+
 def parse_variant(name: str):
     """'SCH-SI-B:v3.1@ups_p=0.5,rs0_pb=0' -> ('SCH-SI-B:v3.1', {'ups_p': 0.5, 'rs0_pb': 0.0}); no '@': no edits."""
     base, _, spec = name.partition("@")
@@ -103,15 +176,23 @@ class XcholeFunctional(PointFunctional):
         if digest != sha:
             raise XcholePinError(f"{path}: sha256 {digest} != pinned {sha}")
         rec = json.loads(raw)
-        bad = sorted(set(edits) - set(registry.HASH_EXCLUDE))
-        if bad:
-            raise ValueError(f"{name}: {bad} enter the cached norms (not in registry.HASH_EXCLUDE): a variant would need a norm "
-                             f"re-solve; not supported here")
         missing = sorted(set(edits) - set(rec["best"]["theta"]))
         if missing:
             raise KeyError(f"{name}: {missing} are not theta fields of {fname}")
-        rec = copy.deepcopy(rec)
-        rec["best"]["theta"].update(edits)
+        norm_dep = sorted(set(edits) - set(registry.HASH_EXCLUDE))
+        if norm_dep:
+            # edited fields that enter the cached norms: the norms are re-solved ONCE by xchole's public external.load
+            # (prepare_variant, a separate serial step) and read here from the cache; never solved per rank
+            path_c = variant_cache_path(name, digest)
+            if not os.path.exists(path_c):
+                raise FileNotFoundError(f"{name}: norm-dependent edits {norm_dep}; run 'xcsb prep-variant {name}' first "
+                                        f"({path_c} missing)")
+            rec = json.load(open(path_c))
+            if {k: rec["best"]["theta"][k] for k in edits} != edits:
+                raise ValueError(f"{path_c}: cached record does not carry the edits {edits}")
+        else:
+            rec = copy.deepcopy(rec)
+            rec["best"]["theta"].update(edits)
         r2, si = params.of_record(rec)
         from xchole.sch_si.jax_sc import sc_dict
         xp, cp, scp = params.candidate_params(r2)
@@ -122,7 +203,8 @@ class XcholeFunctional(PointFunctional):
                         kappa_G=si.kappa_G)
         self._prov = {"name": name, "kind": "xchole" if not edits else "xchole diagnostic variant", "xchole_commit": commit,
                       "record": fname, "record_sha256": digest, "theta_edits": edits,
-                      "norms": "cached (edited fields are norm-independent: registry.HASH_EXCLUDE)",
+                      "norms": (f"re-solved by xchole external.load for {norm_dep} (cache {variant_cache_path(name, digest)})"
+                                if norm_dep else "cached (edited fields are norm-independent: registry.HASH_EXCLUDE)"),
                       "published_set": not edits}
         self.record = rec
 

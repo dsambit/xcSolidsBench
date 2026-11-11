@@ -73,12 +73,12 @@ CASES = {
 
 # ---- one SCF per process ----------------------------------------------------------------------------------------------
 def all_cases():
-    from .studies import fe_payback
-    return {**CASES, **fe_payback.CASES}
+    from .studies import fe_magnetism, fe_payback
+    return {**CASES, **fe_payback.CASES, **fe_magnetism.CASES}
 
 
 def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None = None, payback_diag: bool = False,
-        maxiter: int | None = None, mixing_beta: float | None = None):
+        maxiter: int | None = None, mixing_beta: float | None = None, mag_split: bool = False):
     """mode 'native': QE's input_dft = name (host_check: a libxc name for the host E_xc of the native density);
     mode 'hooked': the functional `name` through the hooks. Writes <out>/record.json."""
     from mpi4py import MPI
@@ -103,10 +103,22 @@ def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None =
             _write(rec_path, rec)
     else:
         try:
-            post = None
+            posts = []
             if payback_diag:
                 from .studies.fe_payback import attribution
-                post = lambda g, r, t: attribution(name, g, r, t)          # noqa: E731
+                posts.append(("payback", lambda g, r, t: attribution(name, g, r, t)))
+            if mag_split:
+                from .studies.fe_magnetism import split
+                posts.append(("mag_split", lambda g, r, t: split(name, g, r, t)))
+            def run_posts(g, r, t):
+                out = {}
+                for key, fn in posts:                      # each diagnostic separately: one failure does not hide the other
+                    try:
+                        out[key] = fn(g, r, t)
+                    except Exception as exc:
+                        out[key] = {"error": f"{type(exc).__name__}: {exc}"}
+                return out
+            post = run_posts if posts else None
             kw = {"maxiter": maxiter} if maxiter is not None else {}
             rec = run_hooked(case, name, out, comm, record_path=rec_path, post=post, deviations=deviations, **kw)
         except Exception as exc:
