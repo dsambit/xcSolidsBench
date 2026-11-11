@@ -44,3 +44,6 @@ refdata/
 *.swp
 .idea/
 .vscode/
+
+# per-SCF records (eigenvalue lists etc.) stay out of git; the tier summaries are committed
+results/**/record.json
