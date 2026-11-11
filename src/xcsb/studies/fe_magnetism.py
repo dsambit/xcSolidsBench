@@ -218,7 +218,7 @@ def pairing(fm, rho_up, rho_dn):
         return ex + ec + lam * (eT - ex - ec), ex, ec
 
     wbar = (rho_up * wxu + rho_dn * wxd) / rt
-    return {"model": exc(wxu, wxd, w0), "wc_eq_wx": exc(wxu, wxd, wbar), "wx_eq_wc": exc(w0, w0, w0)}
+    return {"model": exc(wxu, wxd, w0) + (w0,), "wc_eq_wx": exc(wxu, wxd, wbar) + (wbar,), "wx_eq_wc": exc(w0, w0, w0) + (w0,)}
 
 
 def fsm_parts(functional_name, grid, rho, tau):
@@ -263,6 +263,10 @@ def fsm_parts(functional_name, grid, rho, tau):
     out["rho_weighted_mean"] = {kk: float(np.sum(w * (x.rho[0] + x.rho[1]) * fm[kk])) / float(np.sum(w * (x.rho[0] + x.rho[1])))
                                 for kk in ("w_x_up", "w_x_dn", "w_c")}
     pr = pairing(fm, x.rho[0], x.rho[1])
-    out["pairing_ry"] = {kk: {"E_xc": ry(v[0]), "E_x": ry(v[1]), "E_c_base": ry(v[2])} for kk, v in pr.items()}
+    out["pairing_ry"] = {kk: {"E_xc": ry(v[0]), "E_x": ry(v[1]), "E_c_base": ry(v[2]),
+                              "m_weighted_w_c": float(np.sum(w * m * v[3])) / M} for kk, v in pr.items()}
+    out["pairing_note"] = ("w_x,s = the per-spin OUTER exchange switch w of xchole spin_pieces (the weight of the iso-end exchange "
+                           "hole, return factor included; the inner shell weight g_s only splits the iso end into BR-He and shell); "
+                           "w_c = the base outer correlation switch of ueg_terms_reduced, the payback acting on top")
     out["pairing_check_ry"] = out["pairing_ry"]["model"]["E_xc"] - out["E_xc_model_ry"]
     return out
