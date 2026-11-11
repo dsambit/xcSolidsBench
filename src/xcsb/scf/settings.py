@@ -8,7 +8,8 @@ MAXITER = 200
 MIXING_MODE = "plain"        # Broyden
 MIXING_BETA = 0.3
 MIXING_NDIM = 8
-SMEARING = "mv"              # Marzari-Vanderbilt cold smearing
+SMEARING = "gaussian"        # occupations in [0, 1] keep rho_sigma = sum f |psi|^2 >= 0; cold (Marzari-Vanderbilt) and
+                             # Methfessel-Paxton smearing have negative occupations (M0: SG15 Fe gave rho_sigma < 0 with mv)
 STARTINGWFC = "atomic+random"
 CARRIER_DFT = "TPSS"         # QE-internal meta-GGA: makes QE compute, mix and apply tau; its XC is switched off (exttype 4)
 EXTTYPE_XC = 4               # QEpy: skip QE's XC; v_xc, v_tau and E_xc come from the hook

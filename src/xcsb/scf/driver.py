@@ -99,23 +99,30 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
     t0 = time.time()
     rank = comm.Get_rank()
     f = get_functional(functional_name)
-    # Start (the same for every functional): the converged ground state of the carrier meta-GGA (QE's own TPSS SCF from
-    # QE's cold start), read back as startingpot = startingwfc = 'file'. Its density is an SCF output, sum f |psi|^2 >= 0
-    # with tau >= tau_W (DESIGN 4.5); the atomic superposition is not positive (SG15 Fe: 0.85 e of negative charge) and
-    # the density of the bare starting orbitals is far from self-consistency (Fe: dr2 ~ 7e2 Ry), so the hook sees neither.
-    outdir = os.path.join(workdir, "out")
-    c = QESession(case, settings.CARRIER_DFT, os.path.join(workdir, "carrier"), comm, iterative=False, outdir=outdir)
-    c.driver.scf()
-    carrier = {"converged": bool(c.driver.qepy_modules.control_flags.get_conv_elec()), "energies_ry": c.energies(),
-               "magnetization": c.magnetization()}
-    c.driver.save("all")
-    c.stop()
-    if not carrier["converged"]:
-        raise SCFError(f"start: the carrier {settings.CARRIER_DFT} SCF did not converge")
-    s = QESession(case, settings.CARRIER_DFT, workdir, comm, iterative=True, outdir=outdir, restart=True)
+    # Start (the same for every functional): the carrier meta-GGA (QE's own TPSS, exttype 0) is converged first in the
+    # SAME QEpy session and loop (diagonalize, mix), from QE's cold start; the hook then takes over from that density.
+    # An SCF-converged density is (up to the mixing residual) an output density sum f |psi|^2 >= 0 with occupations in
+    # [0, 1] (Gaussian smearing), tau >= tau_W (DESIGN 4.5). Found in M0: the atomic superposition is not positive (SG15
+    # Fe: 0.85 e of negative charge); the bare starting orbitals' density is far from self-consistency (Fe: dr2 ~ 7e2 Ry);
+    # a save/restart through QE's files changed the density (Fe: 0.054 e negative after reading back).
+    s = QESession(case, settings.CARRIER_DFT, workdir, comm, iterative=True)
+    carrier = {"history": []}
+    for it in range(1, maxiter + 1):
+        s.driver.diagonalize()
+        s.driver.mix(mix_coef=case.mixing_beta)
+        dr2 = float(s.driver.get_scf_error())
+        conv = bool(s.driver.qepy_modules.control_flags.get_conv_elec())
+        carrier["history"].append({"iter": it, "dr2": dr2, **s.magnetization()})
+        if conv:
+            break
+    else:
+        raise SCFError(f"start: the carrier {settings.CARRIER_DFT} did not converge in {maxiter} iterations")
+    carrier.update(iterations=it, magnetization=s.magnetization())
+    # QEpy marks an exttype-0 run as finished at convergence (rho is then the output density); the hook continues it
+    s.driver.embed.finish = False
     rec = {"mode": "hooked", "functional": functional_name, "functional_provenance": f.provenance,
            "case": case.as_dict(), "provenance": code_provenance(), "history": [], "status": "running",
-           "start": f"converged {settings.CARRIER_DFT} (QE native) ground state, startingpot/startingwfc = 'file'",
+           "start": f"converged {settings.CARRIER_DFT} (QE native, exttype 0) in the same session, then the hook",
            "carrier": carrier}
     record_path = record_path or os.path.join(workdir, "record.json")
     e_prev = None

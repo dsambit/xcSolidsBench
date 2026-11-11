@@ -294,9 +294,11 @@ failure (MAXITER, negative ρ_σ, NaN, any QE error): raise; the record is writt
 ```
 
 - Global settings, the same for every system and functional (`scf/settings.py`, recorded in every result): conv_thr,
-  MAXITER, mixing (Broyden 'plain'; beta and ndim fixed by the M1 convergence study), d = 4, Marzari-Vanderbilt cold smearing for
-  every system (one rule: for gapped systems the smearing is inert once degauss ≪ gap, and it handles the cases where a functional
-  closes a gap, e.g. Ge or the monoxides). Per-system physical settings (ecutwfc, k-mesh, degauss) come from the convergence
+  MAXITER, mixing (Broyden 'plain'; beta and ndim fixed by the M1 convergence study), d = 4, Gaussian smearing for every system
+  (one rule: for gapped systems the smearing is inert once degauss ≪ gap, and it handles the cases where a functional closes a
+  gap, e.g. Ge or the monoxides). Occupations must lie in [0, 1] so that ρ_σ = Σ f|ψ|² ≥ 0: cold (Marzari-Vanderbilt) and
+  Methfessel-Paxton smearing have negative occupations and gave ρ_σ < 0 in SG15 Fe (found in M0, 2026-11-10); the free
+  energy's O(σ²) error is handled by the degauss convergence (and QE's σ → 0 estimate is recorded). Per-system physical settings (ecutwfc, k-mesh, degauss) come from the convergence
   protocols (Sec. 6.0) and live in the case files; once fixed they are the same for all functionals.
 - Energy: QE's etot with extene = 2E_xc (Ry) in place of etxc; V3 proves this bookkeeping (incl. descf and the τ terms) by
   reproducing QE-native energies, at nspin = 1 and 2.
@@ -370,7 +372,7 @@ stated with every table. The files go to `$W/pseudo/sg15-1.2/` with sha256 in `p
 **Step 1: the cutoff ladder (user decision 2026-11-10; comes first).**
 
 - Systems: bcc Fe (FM start) and bcc V (NM start: starting_magnetization = 0.0; FM start), nspin = 2, fixed experimental lattice.
-  k-mesh and cold smearing held at a generous fixed setting during the ladder (e.g. 20³, degauss 0.01 Ry; converged in step 2).
+  k-mesh and Gaussian smearing held at a generous fixed setting during the ladder (e.g. 20³, degauss 0.01 Ry; converged in step 2).
 - Functionals: PBE, r2SCAN, SCH-SI-A:v3.1, SCH-SI-B:v3.1; every SCF from a cold start.
 - Ladder: first PBE alone finds its conventional converged cutoff E_c^PBE (the F2/F3 criteria of the table above); then all four
   functionals on ecutwfc/E_c^PBE ∈ {0.6, 0.8, 1, 1.25, 1.5, 2, 2.5, 3}, at d = 4, plus d = 8 at ecutwfc/E_c^PBE = 1, 2 and 3.
@@ -451,7 +453,7 @@ stated with every table. The files go to `$W/pseudo/sg15-1.2/` with sha256 in `p
   test checks the cell (neighbour shells, the AFM-II plane condition). Fixed cubic lattice at the experimental a (the small
   rhombohedral distortion below T_N is not modelled).
 - **k-mesh.** Γ-centred Monkhorst-Pack on the rhombohedral reciprocal lattice, starting at 6×6×6 and converged by the F4
-  criteria; cold smearing as everywhere (FeO and CoO may come out metallic with semilocal functionals).
+  criteria; Gaussian smearing as everywhere (FeO and CoO may come out metallic with semilocal functionals).
 - **Symmetry-breaking start.** Two runs per functional and oxide: (a) AFM-II start with QE's symmetry (D3d of the magnetic cell);
   (b) the same start with `nosym = .true.` and the random component of the starting orbitals, which lets the minority-spin t2g
   occupation of Fe²⁺ (d⁶) and Co²⁺ (d⁷) break the trigonal symmetry (orbital order) if that lowers the energy. Both states and
@@ -502,7 +504,7 @@ LC20, F2 and F3 (e.g. Fe, Ni, V, Pd if present) is reused, not recomputed.
 | V1 | spectral derivatives vs closed forms on band-limited periodic test densities (finite Fourier series inside the sphere; triclinic, bcc, fcc, hcp and AFM-II cells), both spin channels; ∇²ρ = tr H; adjointness ⟨D_i f, g⟩ = −⟨f, D_i g⟩ and symmetry of the second-order operators; Σ M = ngm_g; adapters: libxc vs finite differences, xchole vs the handoff sanity points, zero-padding points | laptop, seconds | 1e−12 relative (derivatives, adjoints); 1e−10 (sanity points) |
 | V2a | potential vs finite differences of the grid energy: E_grid(ρ ± εδρ_σ) and E_grid(τ ± εδτ_σ) along random sphere-limited directions, **each spin channel separately** (δρ_↑ only, δρ_↓ only, δτ_↑, δτ_↓) and in the nspin = 1 and nspin = 2 layouts, on polarized test densities (ζ up to ±0.9); test functional, PBE, r2SCAN, SCH-SI-A, -B | laptop, seconds | central differences at the O(ε²) level, ≤ 1e−7 relative |
 | V2b | orbital-level GKS check: a numpy plane-wave toy (a few orbitals per spin, several k) with ρ_σ, τ_σ from orbitals; FD of E_xc along occupied-virtual rotations within each spin channel vs 2 Re⟨δψ∣Ĥ_xc,σ∣ψ⟩, Ĥ_xc,σ ψ = v_σψ − ½∇·(v_τ,σ∇ψ) (Ha); validates the ½ in τ and the τ operator per spin | laptop, seconds | ≤ 1e−7 relative |
-| V3 | (finding, M0: QE's native meta-GGA drivers set e_xc = 0 at grid points with \|∇ρ\|² ≤ 1e-24, i.e. at centres of symmetry on the grid; its TPSS therefore differs from libxc TPSS by mRy on symmetric cells. TPSS is compared on cells without such points, the host E_xc check removes exactly those points, and the symmetric TPSS cases are diagnostics.) the hooks reproduce QE native: libxc PBE vs `input_dft='PBE'`, libxc TPSS vs `'TPSS'`; (i) bulk Si, nspin = 1, fixed occupations; (ii) **bcc Fe, nspin = 2, cold smearing, FM**; and the host's E_xc of the native ground states vs QE's etxc in both cases | node | ΔE_tot ≤ 1e−5 Ry/atom, eigenvalues ≤ 1e−5 Ry, moment ≤ 1e−4 μB (limited by QE's internal density thresholds and QE vs libxc implementation details; the measured differences are recorded) |
+| V3 | (finding, M0: QE's native meta-GGA drivers set e_xc = 0 at grid points with \|∇ρ\|² ≤ 1e-24, i.e. at centres of symmetry on the grid; its TPSS therefore differs from libxc TPSS by mRy on symmetric cells. TPSS is compared on cells without such points, the host E_xc check removes exactly those points, and the symmetric TPSS cases are diagnostics.) the hooks reproduce QE native: libxc PBE vs `input_dft='PBE'`, libxc TPSS vs `'TPSS'`; (i) bulk Si, nspin = 1, fixed occupations; (ii) **bcc Fe, nspin = 2, Gaussian smearing, FM**; and the host's E_xc of the native ground states vs QE's etxc in both cases | node | ΔE_tot ≤ 1e−5 Ry/atom, eigenvalues ≤ 1e−5 Ry, moment ≤ 1e−4 μB (limited by QE's internal density thresholds and QE vs libxc implementation details; the measured differences are recorded) |
 | V4 | spin consistency: nspin = 2 at zero magnetization (Si with tot_magnetization = 0) equals nspin = 1 | node | ΔE ≤ 1e−8 Ry |
 | V5 | MPI: the host step (inputs → potentials) bitwise identical for 1, 4, 32 ranks on the same gathered input, nspin = 1 and 2; a full SCF at 1 vs 32 ranks (QE itself is not bitwise reproducible across rank counts) | node | bitwise / ΔE ≤ 1e−8 Ry |
 | V6 | smoke SCFs: bulk Si, then FM bcc Fe, with PBE, r2SCAN, SCH-SI-A, -B through the hooks, cold starts | node | converge; timings recorded (they replace the estimates of Sec. 9) |
