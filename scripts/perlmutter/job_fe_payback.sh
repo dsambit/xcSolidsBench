@@ -29,12 +29,9 @@ EOF
 one() {   # case name [flags]
   local case=$1 name=$2; shift 2
   local tag="${case}__${name//[:@,=]/_}"
-  if python - "$RUN" "$case" "$name" <<'PY'
-import json, os, sys
-from xcsb import tiers
-p = os.path.join(tiers.run_dir(sys.argv[1], sys.argv[2], "hooked", sys.argv[3]), "record.json")
-sys.exit(0 if os.path.exists(p) and json.load(open(p)).get("status") == "ok" else 1)
-PY
+  local safe=${name//:/_}; safe=${safe//@/__}; safe=${safe//,/_}; safe=${safe//=/}     # = xcsb.tiers.run_dir
+  local rec="$RUN/${case}__hooked__${safe}/record.json"
+  if [ -f "$rec" ] && grep -q '"status": "ok"' "$rec"
   then echo "$tag skip (done)" >> "$RUN/summary.txt"; return; fi
   local t0=$(date +%s)
   timeout "$STEP_TIMEOUT" srun -N 1 -n 8 -c 8 --exact --cpu-bind=cores python -m xcsb.cli scf --case "$case" --mode hooked \
