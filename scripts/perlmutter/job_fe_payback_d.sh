@@ -1,7 +1,7 @@
 #!/bin/bash
 # Fe payback follow-up (user 2026-11-10): the alignment weight d. Same smoke settings as job_fe_payback.sh.
-#   lanes 1-3: B with d = 0.5, 1.0, 0 at the installed r_s0 0.75, ups_p 1 (the d = 0 run with the frozen attribution);
-#   lane 4: converge B with d = 0, r_s0 = 0: beta 0.3 with MAXITER 400; if it fails, one labelled diagnostic run at beta 0.1.
+#   B with d = 0.5, 1.0, 0 at the installed r_s0 0.75, ups_p 1 (r_s0 = 0 is not a usable setting: user 2026-11-10);
+#   d = 0 (with the frozen attribution): MAXITER 400 at beta 0.3; if it fails, one labelled diagnostic run at beta 0.1.
 set -uo pipefail
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 source "$REPO/scripts/perlmutter/env_xcsb.sh"
@@ -19,8 +19,7 @@ run() {   # tag args...
 }
 run d0.5 --name "$B@d=0.5" &
 run d1.0 --name "$B@d=1.0" &
-run d0   --name "$B@d=0" --payback-diag &
-( run d0_rs0_0_beta0.3_maxiter400 --name "$B@d=0,rs0_pb=0" --maxiter 400 --payback-diag \
-  || run d0_rs0_0_beta0.1_maxiter400 --name "$B@d=0,rs0_pb=0" --maxiter 400 --mixing-beta 0.1 --tag beta0.1 --payback-diag ) &
+( run d0_beta0.3_maxiter400 --name "$B@d=0" --maxiter 400 --payback-diag \
+  || run d0_beta0.1_maxiter400 --name "$B@d=0" --maxiter 400 --mixing-beta 0.1 --tag beta0.1 --payback-diag ) &
 wait
 echo "done $(date -Is)" >> "$RUN/summary.txt"
