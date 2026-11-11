@@ -31,6 +31,7 @@ TOL_V3_EIG = 1e-5      # Ry
 TOL_V3_MAG = 1e-4      # mu_B / cell
 TOL_V3_EXC = 1e-6      # relative, host E_xc on the native density vs QE etxc (QE's meta threshold points removed)
 TOL_V4_E = 1e-8        # Ry
+FE_MIXING = 0.1        # verification Fe cells: Broyden beta (round 3: SCH-SI-B at beta 0.3 stalled at dr2 ~ 1e-9 > conv_thr)
 
 
 def case_si(**kw):
@@ -48,7 +49,7 @@ def case_si_lowsym():
 
 def case_fe(**kw):
     return Case(bcc("Fe", A_FE), ecutwfc=kw.pop("ecutwfc", 60.0), kmesh=(8, 8, 8), occupations="smearing", degauss=0.02,
-                nspin=2, starting_magnetization={"Fe": 0.5}, **kw)
+                nspin=2, starting_magnetization={"Fe": 0.5}, mixing_beta=FE_MIXING, **kw)
 
 
 def case_fe_offset():
@@ -57,7 +58,7 @@ def case_fe_offset():
     s = bcc("Fe", A_FE)
     off = Structure("bcc-Fe-offset", s.lattice, s.labels, np.array([[0.137, 0.271, 0.419]]), s.elements)
     return Case(off, ecutwfc=60.0, kmesh=(4, 4, 4), occupations="smearing", degauss=0.02, nspin=2,
-                starting_magnetization={"Fe": 0.5}, nosym=True)
+                starting_magnetization={"Fe": 0.5}, nosym=True, mixing_beta=FE_MIXING)
 
 
 CASES = {
