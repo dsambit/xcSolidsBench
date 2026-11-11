@@ -10,6 +10,8 @@ export XCSB_QEPY_SRC=$XCSB_BUILD/qepy-eb03de77
 export XCSB_XCHOLE_SRC=$W/src/xchole-84af4629/src          # strongxc-v3 at the v3.1 install commit (read-only use)
 export XCSB_PSEUDO_DIR=$W/pseudo/sg15-1.2
 export JAX_COMPILATION_CACHE_DIR=$W/cache/jax
+export ATOMIC_ORBITALS_PATH=$W/external/AtomicOrbitals         # xchole's norm re-solves (Koga HF densities; xchole.core.data)
+export XCSB_NORM_CACHE=$W/cache/xchole_norms
 export JAX_ENABLE_X64=1
 mkdir -p $HOME $TMPDIR $XDG_CACHE_HOME $CONDA_PKGS_DIRS $JAX_COMPILATION_CACHE_DIR
 # module and conda scripts are not 'set -eu' clean: relax the caller's -e/-u while loading, then restore them
