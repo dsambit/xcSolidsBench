@@ -53,14 +53,14 @@ if has V4; then
 fi
 has V5_np8        && step V5_np8        $S8 python -m xcsb.cli tier v5 --out "$RUN/V5"
 has V5_np32       && step V5_np32       env OMP_NUM_THREADS=4 $S32 python -m xcsb.cli tier v5 --out "$RUN/V5"
+if has V6_np1; then
+  step V6_np1_Si_PBE env OMP_NUM_THREADS=32 $S1 $SCF --case Si --mode hooked --name PBE --root "$RUN/V6_np1"
+  step V6_np1_compare python -m xcsb.cli compare v6 --root "$RUN/V6_np1"
+fi
 if has V6; then
   for c in Si Fe; do for x in PBE r2SCAN SCH-SI-A:v3.1 SCH-SI-B:v3.1; do
     step V6_${c}_${x/:/_} $S8 $SCF --case $c --mode hooked --name $x --root "$RUN/V6"
   done; done
   step V6_compare python -m xcsb.cli compare v6 --root "$RUN/V6"
-fi
-if has V6_np1; then
-  step V6_np1_Si_PBE env OMP_NUM_THREADS=32 $S1 $SCF --case Si --mode hooked --name PBE --root "$RUN/V6_np1"
-  step V6_np1_compare python -m xcsb.cli compare v6 --root "$RUN/V6_np1"
 fi
 echo "done $(date -Is)" >> "$SUMMARY"
