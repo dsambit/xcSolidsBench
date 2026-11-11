@@ -41,6 +41,18 @@ PY
       --name "$name" --root "$RUN" "$@" > "$RUN/$tag.log" 2>&1
   echo "$tag rc=$? $(( $(date +%s) - t0 ))s" >> "$RUN/summary.txt"
 }
+# smoke of the frozen attribution on a synthetic polarized density (fails fast before the queue; result logged only)
+timeout 900 srun -N 1 -n 1 -c 32 --exact --cpu-bind=cores env OMP_NUM_THREADS=16 python - > "$RUN/attr_smoke.log" 2>&1 <<'PY'
+import json, sys
+sys.path.insert(0, "tests")
+from test_v2_potential_fd import setup
+from xcsb.studies.fe_payback import attribution
+g, rho, tau = setup("triclinic")
+a = attribution("SCH-SI-B:v3.1", g, rho, tau)
+print(json.dumps({k: a[k] for k in ("E_payback_ry", "d_Ex_ry", "m_weighted_mean")}, default=float))
+print(json.dumps(a["factors"]["dw_switch_shift"], default=float))
+PY
+echo "attr_smoke rc=$?" >> "$RUN/summary.txt"
 export -f one
 export RUN STEP_TIMEOUT
 xargs -P 4 -L 1 bash -c 'one "$@"' _ < "$RUN/queue.txt"
