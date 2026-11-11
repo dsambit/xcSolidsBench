@@ -4,7 +4,6 @@ from __future__ import annotations
 
 DUAL = 4                     # ecutrho = DUAL * ecutwfc (protocol; 8 only as the quadrature check of M1 step 1)
 CONV_THR = 1e-10             # Ry, QE's estimated scf accuracy per cell
-E_TOL = 1e-8                 # Ry, |Delta E_tot| between the last two steps at convergence
 MAXITER = 200
 MIXING_MODE = "plain"        # Broyden
 MIXING_BETA = 0.3

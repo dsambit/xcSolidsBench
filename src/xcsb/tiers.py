@@ -29,7 +29,7 @@ A_FE = 2.866 * BOHR_PER_ANGSTROM
 TOL_V3_E = 1e-5        # Ry/atom
 TOL_V3_EIG = 1e-5      # Ry
 TOL_V3_MAG = 1e-4      # mu_B / cell
-TOL_V3_EXC = 1e-6      # relative, host E_xc on the native density vs QE etxc
+TOL_V3_EXC = 1e-6      # relative, host E_xc on the native density vs QE etxc (QE's meta threshold points removed)
 TOL_V4_E = 1e-8        # Ry
 
 
@@ -51,11 +51,21 @@ def case_fe(**kw):
                 nspin=2, starting_magnetization={"Fe": 0.5}, **kw)
 
 
+def case_fe_offset():
+    """bcc Fe with the atom at a generic fractional position and no symmetry: no grid point sits at a centre of symmetry,
+    so QE's native meta-GGA thresholds (e_xc := 0 where |grad rho|^2 <= 1e-24) never trigger."""
+    s = bcc("Fe", A_FE)
+    off = Structure("bcc-Fe-offset", s.lattice, s.labels, np.array([[0.137, 0.271, 0.419]]), s.elements)
+    return Case(off, ecutwfc=60.0, kmesh=(4, 4, 4), occupations="smearing", degauss=0.02, nspin=2,
+                starting_magnetization={"Fe": 0.5}, nosym=True)
+
+
 CASES = {
     "Si": case_si,
     "Si-lowsym": case_si_lowsym,
     "Si-nspin2-m0": lambda: case_si(nspin=2, tot_magnetization=0.0),
     "Fe": case_fe,
+    "Fe-offset": case_fe_offset,
 }
 
 
@@ -98,13 +108,19 @@ def _load(root, case_name, mode, name):
 
 
 def _cmp(nat, a, b):
+    """Native record a vs hooked record b. A global spin flip (the mirror ferromagnet, m -> -m) is the same state: then
+    the hooked spin blocks of the eigenvalues (QE lists the k points of spin up, then spin down) are swapped."""
     ea, eb = a["energies_ry"]["etot"], b["energies_ry"]["etot"]
     eiga, eigb = np.asarray(a["eigenvalues_ry"]), np.asarray(b["eigenvalues_ry"])
+    ma, mb = a["magnetization"], b["magnetization"]
+    flipped = bool(ma["total"] * mb["total"] < 0 and abs(ma["total"]) > 1e-3)
+    if flipped:
+        half = eigb.shape[1] // 2
+        eigb = np.concatenate([eigb[:, half:], eigb[:, :half]], axis=1)
     out = {"etot_native": ea, "etot_hooked": eb, "d_etot_per_atom": abs(ea - eb) / nat,
            "d_eig_max": float(np.max(np.abs(eiga - eigb))) if eiga.shape == eigb.shape else None,
-           "mag_native": a["magnetization"], "mag_hooked": b["magnetization"],
-           "d_mag_total": abs(a["magnetization"]["total"] - b["magnetization"]["total"]),
-           "d_mag_abs": abs(a["magnetization"]["absolute"] - b["magnetization"]["absolute"]),
+           "mag_native": ma, "mag_hooked": mb, "spin_flipped": flipped,
+           "d_mag_total": abs(abs(ma["total"]) - abs(mb["total"])), "d_mag_abs": abs(ma["absolute"] - mb["absolute"]),
            "iterations_hooked": b.get("iterations")}
     out["pass"] = bool(out["d_etot_per_atom"] <= TOL_V3_E and out["d_eig_max"] is not None
                        and out["d_eig_max"] <= TOL_V3_EIG and out["d_mag_total"] <= TOL_V3_MAG
@@ -112,34 +128,46 @@ def _cmp(nat, a, b):
     return out
 
 
+def _host_check(a):
+    """host E_xc on the native density vs QE's etxc, after removing QE's meta-GGA threshold points (qe_meta_threshold)."""
+    etxc = a["energies_ry"]["etxc"]
+    thr = a.get("qe_meta_threshold", {"npoints": 0, "host_exc_ry_at_points": 0.0})
+    d = a["host_exc_ry_on_native_density"] - etxc
+    resid = d - thr["host_exc_ry_at_points"]
+    return {"qe_etxc": etxc, "host_minus_qe": d, "qe_threshold_points": thr["npoints"],
+            "host_exc_at_threshold_points": thr["host_exc_ry_at_points"], "residual": resid,
+            "residual_rel": abs(resid / etxc), "pass": bool(abs(resid / etxc) <= TOL_V3_EXC)}
+
+
+V3_SCF = (("Si", "PBE"), ("Fe", "PBE"), ("Si-lowsym", "TPSS"), ("Fe-offset", "TPSS"))     # pass criteria
+V3_DIAG = (("Si", "TPSS"), ("Fe", "TPSS"))      # diagnostics: QE's thresholds change its TPSS at symmetric grid points
+
+
 def compare_v3(root):
     res = {"tolerances": {"etot_ry_per_atom": TOL_V3_E, "eig_ry": TOL_V3_EIG, "mag_muB": TOL_V3_MAG,
-                          "exc_rel": TOL_V3_EXC}, "cases": {}}
-    for cname in ("Si", "Fe"):
-        nat = CASES[cname]().structure.nat
-        for xc in ("PBE", "TPSS"):
+                          "exc_rel": TOL_V3_EXC}, "cases": {}, "diagnostics": {}}
+    for group, items in (("cases", V3_SCF), ("diagnostics", V3_DIAG)):
+        for cname, xc in items:
+            nat = CASES[cname]().structure.nat
             a, b = _load(root, cname, "native", xc), _load(root, cname, "hooked", xc)
             key = f"{cname}/{xc}"
             if a.get("status") != "ok" or b.get("status") != "ok":
-                res["cases"][key] = {"pass": False, "native": a.get("status"), "hooked": b.get("status"),
-                                     "error": a.get("error") or b.get("error")}
+                res[group][key] = {"pass": False, "native": a.get("status"), "hooked": b.get("status"),
+                                   "error": a.get("error") or b.get("error")}
                 continue
             r = _cmp(nat, a, b)
-            etxc = a["energies_ry"]["etxc"]
-            r["host_exc_minus_qe_etxc_ry"] = a["host_exc_ry_on_native_density"] - etxc
-            r["host_exc_rel"] = abs(r["host_exc_minus_qe_etxc_ry"] / etxc)
-            r["pass"] = bool(r["pass"] and r["host_exc_rel"] <= TOL_V3_EXC)
-            res["cases"][key] = r
-    for xc in ("PBE", "TPSS"):
+            r["host_check"] = _host_check(a)
+            r["pass"] = bool(r["pass"] and r["host_check"]["pass"])
+            if group == "diagnostics":
+                r["note"] = ("not a pass criterion: QE's native meta-GGA sets e_xc = 0 at grid points with |grad rho|^2 <= "
+                             "1e-24 (centres of symmetry); the host check removes exactly those points")
+            res[group][key] = r
+    for xc in ("PBE",):
         a = _load(root, "Si-lowsym", "native", xc)
         key = f"Si-lowsym/{xc}/host_exc"
-        if a.get("status") != "ok":
-            res["cases"][key] = {"pass": False, "native": a.get("status"), "error": a.get("error")}
-            continue
-        etxc = a["energies_ry"]["etxc"]
-        d = a["host_exc_ry_on_native_density"] - etxc
-        res["cases"][key] = {"qe_etxc": etxc, "host_minus_qe": d, "rel": abs(d / etxc), "pass": bool(abs(d / etxc) <= TOL_V3_EXC)}
+        res["cases"][key] = _host_check(a) if a.get("status") == "ok" else {"pass": False, "native": a.get("status")}
     res["pass"] = all(v["pass"] for v in res["cases"].values())
+    res["diagnostics_host_check_pass"] = all(v.get("host_check", {}).get("pass", False) for v in res["diagnostics"].values())
     return res
 
 

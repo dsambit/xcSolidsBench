@@ -34,11 +34,14 @@ has debug_fd      && step debug_fd      env OMP_NUM_THREADS=32 $S1 python script
 has pytest_laptop && step pytest_laptop $S1 python -m pytest -q -m "not node" tests
 has pytest_node   && step pytest_node   env OMP_NUM_THREADS=32 $S1 python -m pytest -q -m node -rA tests
 if has V3; then
-  for c in Si Fe; do for x in PBE TPSS; do
+  # pass items: PBE on the symmetric cells, TPSS on cells without grid points at centres of symmetry; diagnostics: TPSS
+  # on the symmetric cells (QE's native meta thresholds); plus the host E_xc check on every native density
+  for cx in Si:PBE Fe:PBE Si-lowsym:TPSS Fe-offset:TPSS Si:TPSS Fe:TPSS; do
+    c=${cx%%:*}; x=${cx##*:}
     step V3_${c}_${x}_native $S8 $SCF --case $c --mode native --name $x --host-check $x --root "$RUN/V3"
     step V3_${c}_${x}_hooked $S8 $SCF --case $c --mode hooked --name $x --root "$RUN/V3"
-  done; done
-  for x in PBE TPSS; do step V3_Si-lowsym_${x}_native $S8 $SCF --case Si-lowsym --mode native --name $x --host-check $x --root "$RUN/V3"; done
+  done
+  step V3_Si-lowsym_PBE_native $S8 $SCF --case Si-lowsym --mode native --name PBE --host-check PBE --root "$RUN/V3"
   step V3_compare python -m xcsb.cli compare v3 --root "$RUN/V3"
 fi
 if has V4; then

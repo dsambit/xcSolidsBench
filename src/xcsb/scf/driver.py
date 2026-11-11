@@ -2,8 +2,9 @@
 
     loop: hook (rho, tau -> E_xc, v, v_tau -> extpot, extkin, extene) -> QE diagonalize -> QE mix (rho, tau) -> converged?
 
-Converged = QE's conv_elec (estimated scf accuracy < conv_thr) and |Delta E_tot| < settings.E_TOL between the last two
-steps. MAXITER without convergence, a negative spin density, a NaN or any QE error raise; the record is written first
+Converged = QE's conv_elec (estimated scf accuracy < conv_thr), QE's own criterion; |Delta E_tot| of the last step is
+recorded (QEpy's iterative energy lags the density by one step, so it is not a convergence measure). MAXITER without
+convergence, a negative spin density, a NaN or any QE error raise; the record is written first
 with status "failed" and the history.
 """
 from __future__ import annotations
@@ -48,6 +49,23 @@ def _write(path, rec):
     os.replace(tmp, path)
 
 
+def qe_meta_threshold_part(f, grid, rho, tau, nspin):
+    """QE's native meta-GGA drivers set e_xc = 0 at every point where rho, |grad rho|^2 or tau is at or below a fixed
+    threshold (XClib qe_drivers_mgga.f90: rho_threshold_mgga 1e-12, grho2_threshold_mgga 1e-24, tau_threshold_mgga 1e-12;
+    nspin 2: on rho_up + rho_dn, 4 (|grad rho_up|^2 + |grad rho_dn|^2), tau_up + tau_dn). Grid points at centres of symmetry
+    have grad rho = 0 exactly. The host E_xc (Ry) at those points, i.e. the expected host - QE difference."""
+    from ..host.evaluate import point_inputs
+    x, grad = point_inputs(grid, rho, tau, False, False)
+    e = f.evaluate(x).extra["e"]
+    rt, tt = x.rho.sum(0), x.tau.sum(0)
+    if nspin == 1:
+        g2 = np.sum(grad.sum(0) ** 2, axis=0).reshape(-1)
+    else:
+        g2 = 4.0 * (np.sum(grad[0] ** 2, axis=0) + np.sum(grad[1] ** 2, axis=0)).reshape(-1)
+    mask = (np.abs(rt) <= 1e-12) | (g2 <= 1e-24) | (np.abs(tt) <= 1e-12)
+    return {"npoints": int(np.count_nonzero(mask)), "host_exc_ry_at_points": 2.0 * grid.weight * float(np.sum(e[mask]))}
+
+
 def run_native(case: Case, input_dft: str, workdir: str, comm, host_functional: str | None = None) -> dict:
     """QE's own functional (exttype 0, QE's SCF). Optionally the host's E_xc of the converged native density
     (`host_functional`, a libxc name) for the layout / unit check of V3."""
@@ -67,6 +85,8 @@ def run_native(case: Case, input_dft: str, workdir: str, comm, host_functional: 
         if comm.Get_rank() == 0:
             rec["host_exc_ry_on_native_density"] = 2.0 * res.e_xc
             rec["host_stats"] = res.stats
+            if getattr(hf, "is_meta", False):
+                rec["qe_meta_threshold"] = qe_meta_threshold_part(hf, s.grid, rho, tau, case.nspin)
     rec["seconds"] = time.time() - t0
     s.stop()
     if not conv:
@@ -109,10 +129,8 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
             rec["history"].append(h)
             if not np.isfinite(etot):
                 raise SCFError(f"iteration {it}: E_tot = {etot}")
+            h["d_etot_ry"] = None if e_prev is None else etot - e_prev
             if conv:
-                de = None if e_prev is None else abs(etot - e_prev)
-                if de is None or de > settings.E_TOL:
-                    raise SCFError(f"conv_elec at iteration {it} but |dE| = {de} > E_TOL = {settings.E_TOL}")
                 break
             e_prev = etot
             if rank == 0 and it % 5 == 0:
