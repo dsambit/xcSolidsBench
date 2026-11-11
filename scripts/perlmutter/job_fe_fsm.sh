@@ -58,6 +58,10 @@ if [ $? -ne 0 ]; then echo "STOP: the FSM constraint does not reproduce the free
   echo "Fe80 PBE --fsm-parts"
   for m in 0.0 0.5 1.0 1.5 2.0 2.2 2.4 2.6 2.8 3.0; do echo "Fe80-fsm-$m r2SCAN --fsm-parts"; done
   echo "Fe80 r2SCAN --fsm-parts"
+  # small-m points for the curvature at m = 0 (spin stiffness; user 2026-11-11), behind the main grid
+  for f in SCH-SI-B:v3.1 SCH-SI-A:v3.1 "SCH-SI-B:v3.1#ueg-end" "SCH-SI-A:v3.1#ueg-end" PBE r2SCAN; do
+    for m in 0.1 0.2 0.3; do echo "Fe80-fsm-$m $f --fsm-parts"; done
+  done
 } > "$RUN/queue.txt"
 xargs -P 4 -L 1 bash -c 'one "$@"' _ < "$RUN/queue.txt"
 echo "done $(date -Is)" >> "$SUM"
