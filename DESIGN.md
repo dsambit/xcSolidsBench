@@ -278,11 +278,11 @@ through the same path with v_τ = 0.
 One SCF per (structure, magnetic order, functional, settings); QEpy iterative mode; cold start:
 
 ```
-start: the converged ground state of the carrier (QE's native TPSS SCF from QE's cold start: atomic ρ, starting
-       magnetization per species), saved and read back (startingpot = startingwfc = 'file'); the same for every
-       functional. Its density is an SCF output (ρ ≥ 0, τ ≥ τ_W exactly). Found in M0 (2026-11-10): the atomic
-       superposition is not positive (SG15 Fe: 0.85 e of negative charge) and the density of the bare starting orbitals
-       is far from self-consistency (Fe: dr2 ~ 7e2 Ry, then negative mixed densities), so the hook sees neither.
+start: the carrier (QE's native TPSS, exttype 0) is converged first in the same QEpy session and loop, from QE's cold
+       start (atomic ρ, starting magnetization per species); the hook then continues from that density; the same for
+       every functional. Found in M0 (2026-11-10): the atomic superposition is not positive (SG15 Fe: 0.85 e of negative
+       charge); the bare starting orbitals' density is far from self-consistency (Fe: dr2 ~ 7e2 Ry, then negative mixed
+       densities); a save/restart through QE's files changed the Fe density (0.054 e negative after reading back).
 loop i = 1..MAXITER:
     hook:        ρ_σ, τ_σ <- QE;  e, d <- functional;  v_σ, v_τ,σ <- spectral;  set extpot, extkin, extene (exttype 4)
     diagonalize: QE rebuilds v (Hartree + extpot; v%kin_r <- extkin), c_bands, sum_band -> ρ_out, τ_out
