@@ -3,7 +3,9 @@ Per-system physical settings (ecutwfc, k-mesh, degauss) live in the case files."
 from __future__ import annotations
 
 DUAL = 4                     # ecutrho = DUAL * ecutwfc (protocol; 8 only as the quadrature check of M1 step 1)
-CONV_THR = 1e-10             # Ry, QE's estimated scf accuracy per cell
+CONV_THR_BENCH = 1e-8        # Ry per cell, QE's estimated scf accuracy: every benchmark SCF, every system and functional
+                             # (user 2026-11-10, M1 onward)
+CONV_THR_VERIFY = 1e-10      # Ry per cell: the verification tiers (V3-V6), labelled "verification"
 MAXITER = 200
 MIXING_MODE = "plain"        # Broyden
 MIXING_BETA = 0.3

@@ -35,7 +35,7 @@ FE_MIXING = 0.3        # verification Fe cells: Broyden beta (the global default
 
 
 def case_si(**kw):
-    return Case(diamond("Si", A_SI), ecutwfc=kw.pop("ecutwfc", 30.0), kmesh=(4, 4, 4), occupations="fixed", **kw)
+    return Case(diamond("Si", A_SI), ecutwfc=kw.pop("ecutwfc", 30.0), kmesh=(4, 4, 4), occupations="fixed", conv_class="verification", **kw)
 
 
 def case_si_lowsym():
@@ -44,12 +44,12 @@ def case_si_lowsym():
     frac = s.frac.copy()
     frac[1] += [0.013, -0.007, 0.004]
     low = Structure("Si-lowsym", s.lattice @ strain, s.labels, frac, s.elements)
-    return Case(low, ecutwfc=30.0, kmesh=(3, 3, 3), occupations="fixed", nosym=True)
+    return Case(low, ecutwfc=30.0, kmesh=(3, 3, 3), occupations="fixed", nosym=True, conv_class="verification")
 
 
 def case_fe(**kw):
     return Case(bcc("Fe", A_FE), ecutwfc=kw.pop("ecutwfc", 60.0), kmesh=(8, 8, 8), occupations="smearing", degauss=0.02,
-                nspin=2, starting_magnetization={"Fe": 0.5}, mixing_beta=FE_MIXING, **kw)
+                nspin=2, starting_magnetization={"Fe": 0.5}, mixing_beta=FE_MIXING, conv_class="verification", **kw)
 
 
 def case_fe_offset():
@@ -58,7 +58,7 @@ def case_fe_offset():
     s = bcc("Fe", A_FE)
     off = Structure("bcc-Fe-offset", s.lattice, s.labels, np.array([[0.137, 0.271, 0.419]]), s.elements)
     return Case(off, ecutwfc=60.0, kmesh=(4, 4, 4), occupations="smearing", degauss=0.02, nspin=2,
-                starting_magnetization={"Fe": 0.5}, nosym=True, mixing_beta=FE_MIXING)
+                starting_magnetization={"Fe": 0.5}, nosym=True, mixing_beta=FE_MIXING, conv_class="verification")
 
 
 CASES = {

@@ -16,7 +16,7 @@ def test_fe_fm_input():
     c = Case(bcc("Fe", 5.42), ecutwfc=90.0, kmesh=(12, 12, 12), nspin=2, starting_magnetization={"Fe": 0.6})
     txt = pw_input(c, "TPSS", PDIR, "/tmp/out", "x")
     assert "nspin = 2" in txt and "starting_magnetization(1) = 0.600000" in txt and "ecutrho = 360.000000" in txt
-    assert "input_dft = 'TPSS'" in txt and "smearing = 'mv'" in txt and "tstress = .false." in txt
+    assert "input_dft = 'TPSS'" in txt and "smearing = 'gaussian'" in txt and "conv_thr = 1.000e-08" in txt and "tstress = .false." in txt
 
 
 @needs_pseudos

@@ -293,7 +293,10 @@ end: final hook on the converged density; record
 failure (MAXITER, negative ρ_σ, NaN, any QE error): raise; the record is written with status "failed" and the history
 ```
 
-- Global settings, the same for every system and functional (`scf/settings.py`, recorded in every result): conv_thr,
+- SCF threshold (user 2026-11-10), two named constants in `scf/settings.py`, the class recorded in every result:
+  CONV_THR_BENCH = 1e-8 Ry per cell for every benchmark SCF (all systems and functionals, M1 onward) and
+  CONV_THR_VERIFY = 1e-10 Ry per cell for the verification tiers V3-V6 (labelled "verification").
+- Global settings, the same for every system and functional (`scf/settings.py`, recorded in every result):
   MAXITER, mixing (Broyden 'plain'; beta and ndim fixed by the M1 convergence study), d = 4, Gaussian smearing for every system
   (one rule: for gapped systems the smearing is inert once degauss ≪ gap, and it handles the cases where a functional closes a
   gap, e.g. Ge or the monoxides). Occupations must lie in [0, 1] so that ρ_σ = Σ f|ψ|² ≥ 0: cold (Marzari-Vanderbilt) and

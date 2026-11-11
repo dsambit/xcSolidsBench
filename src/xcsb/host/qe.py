@@ -31,11 +31,17 @@ class Case:
     tot_magnetization: float | None = None
     nosym: bool = False
     dual: int = settings.DUAL
-    conv_thr: float = settings.CONV_THR
+    conv_class: str = "bench"              # "bench" (settings.CONV_THR_BENCH) or "verification" (CONV_THR_VERIFY)
     mixing_beta: float = settings.MIXING_BETA
     nbnd: int | None = None
 
+    @property
+    def conv_thr(self) -> float:
+        return {"bench": settings.CONV_THR_BENCH, "verification": settings.CONV_THR_VERIFY}[self.conv_class]
+
     def __post_init__(self):
+        if self.conv_class not in ("bench", "verification"):
+            raise ValueError(f"conv_class {self.conv_class!r}: 'bench' or 'verification'")
         if self.nspin not in (1, 2):
             raise ValueError("nspin must be 1 or 2 (non-collinear magnetism is out of scope)")
         if self.nspin == 2 and not self.starting_magnetization and self.tot_magnetization is None:
@@ -52,6 +58,7 @@ class Case:
                 "kshift": list(self.kshift), "occupations": self.occupations, "smearing": settings.SMEARING,
                 "degauss": self.degauss, "nspin": self.nspin, "starting_magnetization": dict(self.starting_magnetization),
                 "tot_magnetization": self.tot_magnetization, "nosym": self.nosym, "conv_thr": self.conv_thr,
+                "conv_class": self.conv_class,
                 "mixing_beta": self.mixing_beta, "nbnd": self.nbnd}
 
 
