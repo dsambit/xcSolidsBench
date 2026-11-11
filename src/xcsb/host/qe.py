@@ -111,9 +111,15 @@ class QESession:
     """One QEpy Driver (only one can exist per process) and the host-side grid bookkeeping."""
 
     def __init__(self, case: Case, input_dft: str, workdir: str, comm, iterative: bool, pseudo_dir: str | None = None,
-                 outdir: str | None = None, restart: bool = False):
+                 outdir: str | None = None, restart: bool = False, npool: int = 1):
+        import qepy
         from qepy.driver import Driver
         self.case, self.comm, self.input_dft = case, comm, input_dft
+        if npool < 1 or comm.Get_size() % npool:
+            raise ValueError(f"npool {npool} must divide the rank count {comm.Get_size()}")
+        self.npool = int(npool)
+        # QE's k-point pools (-nk): QEpy reads QE's command line from qepy_sys.command_line (not from the Python argv)
+        qepy.qepy_modules.qepy_sys.set_command_line(f"-nk {self.npool}")
         self._meta = input_dft.upper() in META_DFTS
         self.rank = comm.Get_rank()
         pseudo_dir = pseudo_dir or os.environ["XCSB_PSEUDO_DIR"]
@@ -171,6 +177,32 @@ class QESession:
         d.qepy_pw.qepy_mod.qepy_set_extkin(extkin, gather=True)
         return extene
 
+    def set_spin_densities(self, rho, tau):
+        """Overwrite QE's density and kinetic energy density (rho%of_r/of_g, rho%kin_r/kin_g) with root-side contract arrays
+        (2, n1, n2, n3) Hartree; then read them back and raise unless QE holds exactly what was set. Collective.
+        Used only by the ripple-seeded restart (xcsb.studies.m1_ladder); QE copies rho into the mixer's input (rhoin) at the
+        start of the next diagonalization, so the Broyden history pairs the seeded input with its own output."""
+        d = self.driver
+        if self.rank == 0:
+            rq, kq = layout.qe_spin_arrays(self.nspin, rho, tau)
+        else:
+            rq = d.create_array(gather=True)
+            kq = d.create_array(gather=True)
+        d.set_density(rq, gather=True)                       # group broadcast to the pool roots, then scatter (QEpy)
+        if self.comm.Get_size() > 1:
+            d.qepy_pw.qepy_mod._mp_bcast_group_real_2(kq)
+        d.qepy_pw.qepy_mod.qepy_set_tau(kq, gather=True)
+        r2, t2 = self.spin_densities()
+        bad = None
+        if self.rank == 0:
+            dr = float(np.max(np.abs(r2 - rho)) / np.max(np.abs(rho)))
+            dt = float(np.max(np.abs(t2 - tau)) / np.max(np.abs(tau)))
+            if not (dr <= 1e-12 and dt <= 1e-12):
+                bad = f"set_spin_densities: read-back mismatch (rel. rho {dr:.2e}, tau {dt:.2e})"
+        bad = self.comm.bcast(bad, root=0)
+        if bad:
+            raise RuntimeError(bad)
+
     # -- results ----------------------------------------------------------------------------------------------------
     def energies(self):
         e = self.driver.qepy_pw.ener
@@ -185,7 +217,9 @@ class QESession:
         return {"total": float(lm.get_magtot()), "absolute": float(lm.get_absmag())}
 
     def eigenvalues(self):
-        """et (nbnd, nks) in Ry and the k weights (QE's local k list; run verification cases with one pool)."""
+        """et (nbnd, nks) in Ry and the k weights (QE's local k list: one pool only)."""
+        if self.npool != 1:
+            raise RuntimeError("eigenvalues: QE's k list is pool-local; only with npool = 1")
         w = self.driver.qepy_pw.wvfct
         return np.asarray(w.get_array_et()).copy(), np.asarray(self.driver.qepy_pw.klist.get_array_wk()).copy()
 

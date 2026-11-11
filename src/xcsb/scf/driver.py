@@ -95,9 +95,13 @@ def run_native(case: Case, input_dft: str, workdir: str, comm, host_functional: 
 
 
 def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path: str | None = None,
-               maxiter: int = settings.MAXITER, chunk: int = CHUNK, post=None, deviations: dict | None = None) -> dict:
+               maxiter: int = settings.MAXITER, chunk: int = CHUNK, post=None, deviations: dict | None = None,
+               npool: int = 1, seeds=None) -> dict:
     """post: optional diagnostic called on the root with (grid, rho, tau) of the converged density; its dict is stored
-    as rec["post"] (e.g. xcsb.studies.fe_payback.attribution)."""
+    as rec["post"] (e.g. xcsb.studies.fe_payback.attribution).
+    seeds: optional ripple-seeded restarts after convergence (xcsb.studies.m1_ladder.SeedPlan): each seed overwrites QE's
+    (rho, tau) with the seeded fields built from the converged ones and re-converges in the same session (QE's orbitals as
+    the start, the Broyden history kept); results in rec["ripple"]. The record of the unseeded SCF is complete before."""
     t0 = time.time()
     rank = comm.Get_rank()
     f = get_functional(functional_name)
@@ -107,8 +111,9 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
     # [0, 1] (Gaussian smearing), tau >= tau_W (DESIGN 4.5). Found in M0: the atomic superposition is not positive (SG15
     # Fe: 0.85 e of negative charge); the bare starting orbitals' density is far from self-consistency (Fe: dr2 ~ 7e2 Ry);
     # a save/restart through QE's files changed the density (Fe: 0.054 e negative after reading back).
-    s = QESession(case, settings.CARRIER_DFT, workdir, comm, iterative=True)
+    s = QESession(case, settings.CARRIER_DFT, workdir, comm, iterative=True, npool=npool)
     carrier = {"history": []}
+    tc = time.time()
     for it in range(1, maxiter + 1):
         s.driver.diagonalize()
         s.driver.mix(mix_coef=case.mixing_beta)
@@ -119,16 +124,19 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
             break
     else:
         raise SCFError(f"start: the carrier {settings.CARRIER_DFT} did not converge in {maxiter} iterations")
-    carrier.update(iterations=it, magnetization=s.magnetization())
+    carrier.update(iterations=it, magnetization=s.magnetization(), seconds=time.time() - tc)
     # QEpy marks an exttype-0 run as finished at convergence (rho is then the output density); the hook continues it
     s.driver.embed.finish = False
     rec = {"mode": "hooked", "functional": functional_name, "functional_provenance": f.provenance,
            "case": case.as_dict(), "provenance": code_provenance(), "history": [], "status": "running",
            "start": f"converged {settings.CARRIER_DFT} (QE native, exttype 0) in the same session, then the hook",
-           "carrier": carrier, "maxiter": maxiter, "deviations": deviations or {}}
+           "carrier": carrier, "maxiter": maxiter, "deviations": deviations or {},
+           "parallel": {"ranks": comm.Get_size(), "npool": npool, "chunk": chunk}}
     record_path = record_path or os.path.join(workdir, "record.json")
-    e_prev = None
-    try:
+
+    def hook_loop(history, label):
+        """Hook iterations until QE's conv_elec (read from the flag; QEpy's end_scf runs once, at the very end)."""
+        e_prev = None
         for it in range(1, maxiter + 1):
             ti = time.time()
             rho, tau = s.spin_densities()
@@ -139,28 +147,32 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
             s.driver.diagonalize()
             s.driver.mix(mix_coef=case.mixing_beta)
             dr2 = float(s.driver.get_scf_error())
-            conv = bool(s.driver.check_convergence())
+            conv = bool(s.driver.qepy_modules.control_flags.get_conv_elec())
             etot = float(s.driver.embed.etotal)
             h = {"iter": it, "etot_ry": etot, "dr2": dr2, "conv_elec": conv, "e_xc_ry": None if e_xc is None else 2 * e_xc,
                  "t_hook_s": th, "t_iter_s": time.time() - ti, **s.magnetization()}
             if rank == 0:
                 h.update(min_rho=res.stats["min_rho"], frac_tau_below_tauW=res.stats["frac_points_tau_below_tauW"])
-            rec["history"].append(h)
+            history.append(h)
             if not np.isfinite(etot):
-                raise SCFError(f"iteration {it}: E_tot = {etot}")
+                raise SCFError(f"{label} iteration {it}: E_tot = {etot}")
             h["d_etot_ry"] = None if e_prev is None else etot - e_prev
             if conv:
-                break
+                return it
             e_prev = etot
             if rank == 0 and it % 5 == 0:
                 _write(record_path, rec)
-        else:
-            raise SCFError(f"not converged in {maxiter} iterations (last dr2 {dr2:.3e})")
+        raise SCFError(f"{label}: not converged in {maxiter} iterations (last dr2 {dr2:.3e})")
+
+    try:
+        it = hook_loop(rec["history"], "hook")
         rho, tau = s.spin_densities()
         res = evaluate_on_grid(f, s.grid, rho, tau, comm, chunk)
-        et, wk = s.eigenvalues()
         rec.update(status="ok", iterations=it, energies_ry=s.energies(), magnetization=s.magnetization(),
-                   fermi_ry=s.fermi_level(), eigenvalues_ry=et.tolist(), kweights=wk.tolist())
+                   fermi_ry=s.fermi_level())
+        if npool == 1:
+            et, wk = s.eigenvalues()
+            rec.update(eigenvalues_ry=et.tolist(), kweights=wk.tolist())
         if rank == 0:
             rec.update(e_xc_final_ry=2 * res.e_xc, density_stats=res.stats)
             if post is not None:                         # a diagnostic: its failure is recorded, the SCF result stands
@@ -168,14 +180,54 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
                     rec["post"] = post(s.grid, rho, tau)
                 except Exception as exc:
                     rec["post"] = {"error": f"{type(exc).__name__}: {exc}", "traceback": traceback.format_exc()}
+        rec["seconds"] = time.time() - t0
+        if seeds is not None:
+            if rank == 0:
+                _write(record_path, rec)
+            rec["ripple"] = {"plan": seeds.describe(s.grid) if rank == 0 else None, "seeds": []}
+            base = {"rho": rho, "tau": tau, "e_xc_ry": rec.get("e_xc_final_ry"), "etot_ry": rec["energies_ry"]["etot"],
+                    "magnetization": rec["magnetization"]}
+            for spec in seeds.specs():
+                ts = time.time()
+                out = {"seed": spec, "history": []}
+                rec["ripple"]["seeds"].append(out)
+                try:
+                    r1 = t1 = err = None
+                    if rank == 0:
+                        try:
+                            r1, t1 = seeds.apply(s.grid, rho, tau, spec)
+                        except Exception as exc:
+                            err = f"{type(exc).__name__}: {exc}"
+                    err = comm.bcast(err, root=0)
+                    if err:
+                        raise SCFError(f"seed {spec['label']}: {err}")
+                    seeded = evaluate_on_grid(f, s.grid, r1, t1, comm, chunk)        # collective; E_xc of the seeded fields
+                    if rank == 0:
+                        out["delta_e_xc_seed_ry"] = 2 * seeded.e_xc - base["e_xc_ry"]
+                        out["seeded_density_stats"] = seeded.stats
+                    s.set_spin_densities(r1, t1)
+                    out["iterations"] = hook_loop(out["history"], f"seed {spec['label']}")
+                    r2, t2 = s.spin_densities()
+                    out.update(status="ok", etot_before_ry=base["etot_ry"], etot_after_ry=float(s.energies()["etot"]),
+                               magnetization_before=base["magnetization"], magnetization_after=s.magnetization())
+                    out["delta_etot_ry"] = out["etot_after_ry"] - out["etot_before_ry"]
+                    if rank == 0:
+                        out["amplitudes"] = seeds.amplitudes(s.grid, (rho, tau), (r1, t1), (r2, t2))
+                except Exception as exc:                 # one seed's failure is recorded; the next seed starts from the base
+                    out.update(status="failed", error=f"{type(exc).__name__}: {exc}", traceback=traceback.format_exc())
+                out["seconds"] = time.time() - ts
+                if rank == 0:
+                    _write(record_path, rec)
     except Exception as exc:
         rec.update(status="failed", error=f"{type(exc).__name__}: {exc}", traceback=traceback.format_exc())
         if rank == 0:
             _write(record_path, rec)
         raise
     finally:
-        rec["seconds"] = time.time() - t0
+        rec.setdefault("seconds", time.time() - t0)            # the unseeded SCF (set before the seeds when it converged)
+        rec["seconds_total"] = time.time() - t0
     if rank == 0:
         _write(record_path, rec)
+    s.driver.end_scf()
     s.stop()
     return rec

@@ -12,6 +12,6 @@ fi
 XROOT=$(dirname "$XCSB_XCHOLE_SRC")
 if [ ! -d "$XROOT" ]; then
   git clone -q "$W/xcHoleModelMeta.git" "$XROOT"
-  git -C "$XROOT" checkout -q f9a275025b1988d1f11f8b2da97a5a6c10958a71
+  git -C "$XROOT" checkout -q 0e9e8ee28338d77f4876b98d2ee082031a4ab5fa
 fi
 python3 "$REPO/scripts/fetch_pseudos.py" "$XCSB_PSEUDO_DIR" "$REPO/pseudo/MANIFEST.json"

@@ -21,9 +21,10 @@ import numpy as np
 
 from .contract import PointFunctional, PointInputs, PointOutputs
 
-XCHOLE_PIN = "f9a275025b1988d1f11f8b2da97a5a6c10958a71"     # strongxc-v3, 2026-11-11: the v3.1 sets of 84af4629 (src/xchole/sch_si,
-#   core, ueg_gauge, benchmarks identical to 84af4629 except a refit job script; the new commits add the ellipticity ripple gate)
-#   plus explore/xc_pairing (the P1/P2 frozen pairing diagnostics, reference.e_xc_points)
+XCHOLE_PIN = "0e9e8ee28338d77f4876b98d2ee082031a4ab5fa"     # strongxc-v3, 2026-11-11 (M1 pin): the v3.1 sets
+#   of 84af4629; against the previous pin f9a275025 (FSM study) src/xchole/sch_si, core, ueg_gauge, benchmarks and
+#   explore/xc_pairing differ only in two docstrings (a note moved to manuscript/), the records are byte-identical (sha256
+#   below); the new commits add the ellipticity ripple diagnostics (xchole.ellipticity, unused here)
 RECORD_SHA256 = {                                            # installed records at the pin (src/xchole/sch_si/parameter_sets)
     "SCH-SI-A:v3.1": ("SCH-SI-A-v3.1.json", "cbd4b9c58bda0b15a6857bd463197c5e3c82da6ec2263a4232a09a9e8974280f"),
     "SCH-SI-B:v3.1": ("SCH-SI-B-v3.1.json", "5b9d3a24162b78f8314319b13085d46f2da84e5a983096bfe6c1fd217bbda277"),

@@ -4,6 +4,7 @@
     xcsb compare v3|v4|v6 --root DIR                                                                  (serial)
     xcsb tier v5 --out DIR                                                                            (under srun)
     xcsb run CASE.toml --functional NAME --out DIR                                                    (under srun)
+    xcsb m1 tasks|ec|table --run DIR                                                                  (serial)
 """
 from __future__ import annotations
 
@@ -41,6 +42,13 @@ def main(argv=None):
     s.add_argument("--tag", default="", help="suffix of the run directory (e.g. beta0.1)")
     s.add_argument("--mag-split", action="store_true", help="frozen split of E_xc and its magnetization dependence by piece")
     s.add_argument("--fsm-parts", action="store_true", help="E_x, E_c, pieces, switch means and the frozen pairing test")
+    s.add_argument("--npool", type=int, default=1, help="QE k-point pools (-nk); must divide the rank count")
+    s.add_argument("--ripple", choices=["all", "curvature", "gradient"],
+                   help="M1: ripple-seeded restarts after convergence, both channels or one (studies.m1_ladder)")
+    s.add_argument("--m1-diag", action="store_true", help="M1: BR-concave electron fraction of the converged density")
+    m1 = sub.add_parser("m1", help="M1 cutoff ladder: task list, E_c^PBE, tables (serial; no QE)")
+    m1.add_argument("what", choices=["tasks", "ec", "table"])
+    m1.add_argument("--run", required=True)
     pv = sub.add_parser("prep-variant", help="re-solve and cache the norms of norm-dependent xchole variants (serial)")
     pv.add_argument("names", nargs="+")
     c = sub.add_parser("compare", help="tier verdicts from the SCF records")
@@ -62,12 +70,25 @@ def main(argv=None):
         from . import tiers
         out = tiers.run_dir(a.root, a.case, a.mode, a.name) + (f"__{a.tag}" if a.tag else "")
         rec = tiers.scf(a.case, a.mode, a.name, out, a.host_check, a.payback_diag, a.maxiter, a.mixing_beta, a.mag_split,
-                        a.fsm_parts)
+                        a.fsm_parts, a.npool, a.ripple, a.m1_diag)
         ok = MPI.COMM_WORLD.bcast(rec.get("status") == "ok", root=0)
         if MPI.COMM_WORLD.Get_rank() == 0:
             print(json.dumps({"case": a.case, "mode": a.mode, "name": a.name, "status": rec.get("status"),
                               "error": rec.get("error")}))
         return 0 if ok else 1
+    if a.cmd == "m1":
+        from .studies import m1_ladder as L
+        if a.what == "tasks":
+            for t in L.tasks(a.run):
+                print(json.dumps(dict(t, done=L.done(a.run, t), failed=L.failed(a.run, t))))
+        elif a.what == "ec":
+            print(json.dumps({"ec_pbe": L.e_c_pbe(a.run), "scan": L.scan_table(a.run)}, indent=1, default=float))
+        else:
+            res = L.table(a.run)
+            json.dump(res, open(os.path.join(a.run, "ladder_table.json"), "w"), indent=1, default=float)
+            from .studies.m1_report import render
+            print(render(res))
+        return 0
     if a.cmd == "compare":
         from . import tiers
         res = getattr(tiers, "compare_" + a.tier)(a.root)

@@ -40,6 +40,22 @@ def spin_channels(nspin: int, rho_qe: np.ndarray, kin_qe: np.ndarray, shape):
     raise ValueError(f"nspin = {nspin}: only collinear nspin 1 or 2 (non-collinear is out of scope)")
 
 
+def qe_spin_arrays(nspin: int, rho: np.ndarray, tau: np.ndarray):
+    """The inverse of spin_channels: (rho_qe, kin_qe) (npts, nspin) in QE's layout and units (Fortran-ordered columns) from
+    contract-side rho, tau (2, n1, n2, n3) Hartree. nspin = 1 takes the total (the two channels must then be equal)."""
+    if nspin == 1:
+        if not (np.array_equal(rho[0], rho[1]) and np.array_equal(tau[0], tau[1])):
+            raise ValueError("nspin = 1: the two spin channels must be equal")
+        rq = grid_to_qe(rho[0] + rho[1])[:, None]
+        kq = RY_PER_HA * grid_to_qe(tau[0] + tau[1])[:, None]
+    elif nspin == 2:
+        rq = np.stack([grid_to_qe(rho[s]) for s in range(2)], axis=1)
+        kq = np.stack([RY_PER_HA * grid_to_qe(tau[s]) for s in range(2)], axis=1)
+    else:
+        raise ValueError(f"nspin = {nspin}: only collinear nspin 1 or 2")
+    return np.asfortranarray(rq), np.asfortranarray(kq)
+
+
 def qe_potentials(nspin: int, e_xc_ha: float, v: np.ndarray, v_tau: np.ndarray):
     """(extpot (npts, nspin) Ry, extkin (npts, nspin), extene Ry) from contract-side results."""
     if nspin == 1:

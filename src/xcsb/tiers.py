@@ -78,7 +78,11 @@ def all_cases():
 
 
 def get_case(name):
-    """A named case; 'Fe80-fsm-<m>': bcc Fe at 80 Ry with the total magnetization fixed to m (mu_B per cell)."""
+    """A named case; 'Fe80-fsm-<m>': bcc Fe at 80 Ry with the total magnetization fixed to m (mu_B per cell); 'M1-...': the
+    M1 ladder cases (xcsb.studies.m1_ladder.parse_case)."""
+    if name.startswith("M1-"):
+        from .studies.m1_ladder import get_case as m1_case
+        return m1_case(name)
     if name.startswith("Fe80-fsm-"):
         from .studies.fe_magnetism import case_fe80_fsm
         return case_fe80_fsm(float(name.split("-")[-1]))
@@ -86,7 +90,8 @@ def get_case(name):
 
 
 def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None = None, payback_diag: bool = False,
-        maxiter: int | None = None, mixing_beta: float | None = None, mag_split: bool = False, fsm_parts: bool = False):
+        maxiter: int | None = None, mixing_beta: float | None = None, mag_split: bool = False, fsm_parts: bool = False,
+        npool: int = 1, ripple: str | None = None, m1_diag: bool = False):
     """mode 'native': QE's input_dft = name (host_check: a libxc name for the host E_xc of the native density);
     mode 'hooked': the functional `name` through the hooks. Writes <out>/record.json."""
     from mpi4py import MPI
@@ -121,6 +126,14 @@ def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None =
             if fsm_parts:
                 from .studies.fe_magnetism import fsm_parts as _fp
                 posts.append(("fsm_parts", lambda g, r, t: _fp(name, g, r, t)))
+            if m1_diag:
+                from .studies.m1_ladder import post_diag
+                posts.append(("m1", post_diag))
+            seeds = None
+            if ripple:
+                from .studies.m1_ladder import SeedPlan
+                from .studies.m1_ladder import ripple_channels
+                seeds = SeedPlan(case.ecutwfc, channels=ripple_channels(ripple))
 
             def run_posts(g, r, t):
                 out = {}
@@ -132,7 +145,8 @@ def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None =
                 return out
             post = run_posts if posts else None
             kw = {"maxiter": maxiter} if maxiter is not None else {}
-            rec = run_hooked(case, name, out, comm, record_path=rec_path, post=post, deviations=deviations, **kw)
+            rec = run_hooked(case, name, out, comm, record_path=rec_path, post=post, deviations=deviations, npool=npool,
+                             seeds=seeds, **kw)
         except Exception as exc:
             rec = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"}
     rec["case_name"] = case_name
