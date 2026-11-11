@@ -113,7 +113,7 @@ def attribution(functional_name, grid, rho, tau):
 RY_TO_MEV = 13605.693122994
 
 ROWS = ("SCH-SI-B:v3.1", "SCH-SI-B:v3.1@ups_p=0", "SCH-SI-B:v3.1@ups_p=0.5", "SCH-SI-B:v3.1@rs0_pb=0",
-        "SCH-SI-B:v3.1@rs0_pb=0.375", "SCH-SI-B:v3.1@rs0_pb=1.5", "SCH-SI-A:v3.1", "PBE")
+        "SCH-SI-B:v3.1@rs0_pb=0.375", "SCH-SI-B:v3.1@rs0_pb=1.5", "SCH-SI-A:v3.1")   # no PBE: computed once in M1, banked
 
 
 def table(root):
@@ -128,11 +128,11 @@ def table(root):
         p = os.path.join(run_dir(root, case, "hooked", name), "record.json")
         return json.load(open(p)) if os.path.exists(p) else {"status": "missing"}
 
-    nm = {n: load("Fe100-NM", n) for n in ("SCH-SI-B:v3.1", "SCH-SI-A:v3.1", "PBE", "SCH-SI-B:v3.1@rs0_pb=0")}
+    nm = {n: load("Fe100-NM", n) for n in ("SCH-SI-B:v3.1", "SCH-SI-A:v3.1", "SCH-SI-B:v3.1@rs0_pb=0")}
     rows = []
     for name in ROWS:
         r = load("Fe100", name)
-        ref = nm["PBE"] if name == "PBE" else nm["SCH-SI-A:v3.1"] if name.startswith("SCH-SI-A") else nm["SCH-SI-B:v3.1"]
+        ref = nm["SCH-SI-A:v3.1"] if name.startswith("SCH-SI-A") else nm["SCH-SI-B:v3.1"]
         row = {"functional": name, "status": r.get("status")}
         if r.get("status") == "ok":
             mg = r["magnetization"]

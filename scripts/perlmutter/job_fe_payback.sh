@@ -16,7 +16,6 @@ B=SCH-SI-B:v3.1
 cat > "$RUN/queue.txt" <<EOF
 Fe100 $B --payback-diag
 Fe100 SCH-SI-A:v3.1
-Fe100 PBE
 Fe100 $B@ups_p=0
 Fe100 $B@rs0_pb=0
 Fe100 $B@ups_p=0.5
@@ -24,7 +23,6 @@ Fe100 $B@rs0_pb=0.375
 Fe100 $B@rs0_pb=1.5
 Fe100-NM $B
 Fe100-NM SCH-SI-A:v3.1
-Fe100-NM PBE
 Fe100-NM $B@rs0_pb=0
 EOF
 one() {   # case name [flags]
