@@ -107,7 +107,7 @@ def main(run, out=None):
             row["m_weighted_w_c"] = [p["m_weighted_mean"]["w_c"] for p in post]
             row["pieces_ry"] = {k: [p["pieces_ry"][k] for p in post] for k in post[0]["pieces_ry"]}
             row["pairing"] = {}
-            for v in ("model", "wc_eq_wx", "wx_eq_wc"):
+            for v in [k for k in post[0]["pairing_ry"] if "E_xc" in post[0]["pairing_ry"][k]]:
                 Exc_v = np.array([p["pairing_ry"][v]["E_xc"] for p in post])
                 Exc_m = np.array([p["E_xc_model_ry"] for p in post])
                 Ev = E - Exc_m + Exc_v
@@ -117,7 +117,9 @@ def main(run, out=None):
                                          "m0": None if curv0(ms, Exc_v) is None else curv0(ms, Exc_v) * RY_TO_MEV,
                                          "free": curv_at(ms, Exc_v, mv) * RY_TO_MEV},
                                      "E_minus_E0_meV": ((Ev - Ev[0]) * RY_TO_MEV).tolist(), "implied_moment": mv,
-                                     "m_weighted_w_c": [p["pairing_ry"][v]["m_weighted_w_c"] for p in post]}
+                                     "m_weighted_w_c": [p["pairing_ry"][v].get("m_weighted_w_c",
+                                                                               p["pairing_ry"][v].get("m_weighted_wbar_x"))
+                                                        for p in post]}
         fr = free.get(f)
         if fr:
             row["free_scf"] = {"moment": abs(fr["magnetization"]["total"]), "E_tot_ry": fr["energies_ry"]["etot"]}

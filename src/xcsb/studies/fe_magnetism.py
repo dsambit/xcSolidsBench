@@ -263,8 +263,25 @@ def fsm_parts(functional_name, grid, rho, tau):
     out["rho_weighted_mean"] = {kk: float(np.sum(w * (x.rho[0] + x.rho[1]) * fm[kk])) / float(np.sum(w * (x.rho[0] + x.rho[1])))
                                 for kk in ("w_x_up", "w_x_dn", "w_c")}
     pr = pairing(fm, x.rho[0], x.rho[1])
+    pr.pop("wc_eq_wx")                         # P1 of explore/xc_pairing (below) is the one implementation of w_c := wbar_x
     out["pairing_ry"] = {kk: {"E_xc": ry(v[0]), "E_x": ry(v[1]), "E_c_base": ry(v[2]),
                               "m_weighted_w_c": float(np.sum(w * m * v[3])) / M} for kk, v in pr.items()}
+    # P1, P2 (strongxc-v3 explore/xc_pairing, reference.e_xc_points; base = this set, its payback inside w'_c) at omega 0 and 1
+    from ..functional.xchole import xc_pairing_reference
+    ref = xc_pairing_reference()
+    args = (x.rho[0], x.rho[1], x.grad[0], x.grad[1], x.tau[0], x.tau[1], x.lapl[0], x.lapl[1], x.hess[0], x.hess[1])
+    for form in ("P1", "P2"):
+        for om in (0.0, 1.0):
+            o = ref.e_xc_points(*args, form=form, omega=om, base=functional_name)
+            key = f"{form}_omega{om:g}"
+            out["pairing_ry"][key] = {"E_xc": ry(o["e_xc"]), "E_x": ry(o["e_x"]), "E_c_base": ry(o["e_c_base"]),
+                                      "m_weighted_wbar_x": float(np.sum(w * m * o["wbar_x"])) / M,
+                                      "m_weighted_w_c_prime": float(np.sum(w * m * o["w_c_prime"])) / M}
+    out["pairing_ry"]["P1_omega0.5"] = {"E_xc": 0.5 * (out["pairing_ry"]["P1_omega0"]["E_xc"] + out["pairing_ry"]["P1_omega1"]["E_xc"]),
+                                        "note": "linear in omega at a frozen density"}
+    out["pairing_ry"]["P2_omega0.5"] = {"E_xc": 0.5 * (out["pairing_ry"]["P2_omega0"]["E_xc"] + out["pairing_ry"]["P2_omega1"]["E_xc"]),
+                                        "note": "linear in omega at a frozen density"}
+    out["pairing_omega0_minus_model_ry"] = {f: out["pairing_ry"][f"{f}_omega0"]["E_xc"] - out["E_xc_model_ry"] for f in ("P1", "P2")}
     out["pairing_note"] = ("w_x,s = the per-spin OUTER exchange switch w of xchole spin_pieces (the weight of the iso-end exchange "
                            "hole, return factor included; the inner shell weight g_s only splits the iso end into BR-He and shell); "
                            "w_c = the base outer correlation switch of ueg_terms_reduced, the payback acting on top")

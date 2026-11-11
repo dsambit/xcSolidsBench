@@ -21,7 +21,9 @@ import numpy as np
 
 from .contract import PointFunctional, PointInputs, PointOutputs
 
-XCHOLE_PIN = "84af4629ae790df3cd9fe05e83a837e3e284d309"     # strongxc-v3: "v3.1 install (user GO 2026-11-09)"
+XCHOLE_PIN = "f9a275025b1988d1f11f8b2da97a5a6c10958a71"     # strongxc-v3, 2026-11-11: the v3.1 sets of 84af4629 (src/xchole/sch_si,
+#   core, ueg_gauge, benchmarks identical to 84af4629 except a refit job script; the new commits add the ellipticity ripple gate)
+#   plus explore/xc_pairing (the P1/P2 frozen pairing diagnostics, reference.e_xc_points)
 RECORD_SHA256 = {                                            # installed records at the pin (src/xchole/sch_si/parameter_sets)
     "SCH-SI-A:v3.1": ("SCH-SI-A-v3.1.json", "cbd4b9c58bda0b15a6857bd463197c5e3c82da6ec2263a4232a09a9e8974280f"),
     "SCH-SI-B:v3.1": ("SCH-SI-B-v3.1.json", "5b9d3a24162b78f8314319b13085d46f2da84e5a983096bfe6c1fd217bbda277"),
@@ -149,6 +151,20 @@ def parse_variant(name: str):
         k, _, v = item.partition("=")
         edits[k.strip()] = float(v)
     return base, edits
+
+
+def xc_pairing_reference():
+    """explore/xc_pairing/reference.py of the pinned tree (the P1/P2 frozen pairing diagnostics; read-only xchole use)."""
+    import_pinned_xchole()
+    d = os.path.join(os.path.dirname(os.path.abspath(os.environ["XCSB_XCHOLE_SRC"])), "explore", "xc_pairing")
+    if not os.path.exists(os.path.join(d, "reference.py")):
+        raise XcholePinError(f"{d}/reference.py missing in the pinned tree")
+    if d not in sys.path:
+        sys.path.insert(0, d)
+    import reference
+    if not os.path.abspath(reference.__file__).startswith(d + os.sep):
+        raise XcholePinError(f"imported reference from {reference.__file__}, not from {d}")
+    return reference
 
 
 class XcholeFunctional(PointFunctional):

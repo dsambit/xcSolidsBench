@@ -11,6 +11,7 @@ RUN=${1:?run dir}
 mkdir -p "$RUN"
 cd "$REPO"
 git rev-parse HEAD > "$RUN/COMMIT"
+git -C "$(dirname "$XCSB_XCHOLE_SRC")" rev-parse HEAD > "$RUN/XCHOLE_COMMIT"     # pinned >= f9a275025 (P1/P2 reference)
 export OMP_NUM_THREADS=4 OMP_PLACES=cores OMP_PROC_BIND=close STEP_TIMEOUT=${STEP_TIMEOUT:-3600}
 SUM="$RUN/summary.txt"
 
