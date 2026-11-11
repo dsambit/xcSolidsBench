@@ -130,9 +130,64 @@ def split(functional_name, grid, rho, tau):
            "Delta_mag_ry": {p: ry(fm[p] - nm[p]) for p in PIECES + ("model_total",)},
            "m_weighted_mean": {k: float(np.sum(w * m * fm[k])) / M
                                for k in ("w_x_up", "w_x_dn", "lam_eff_up", "lam_eff_dn", "w_c", "w_c_prime", "Lambda_prime", "rs")}}
+    out["descriptors"] = descriptors(x, fm, w)
     # magnetization energy by r_s region (where does each piece's Delta live)
     edges = (0.0, 0.5, 0.75, 1.0, 1.5, np.inf)
     idx = np.digitize(fm["rs"], edges[1:-1])
     out["Delta_mag_by_rs_ry"] = [{"lo": edges[b], "hi": edges[b + 1], "abs_m_share": float(np.sum(w * m[idx == b])) / M,
                                   **{p: ry((fm[p] - nm[p])[idx == b]) for p in PIECES}} for b in range(len(edges) - 1)]
+    return out
+
+
+def _wq(v, wt, qs=(0.1, 0.25, 0.5, 0.75, 0.9)):
+    v, wt = np.asarray(v).reshape(-1), np.asarray(wt).reshape(-1)
+    o = np.argsort(v)
+    cw = np.cumsum(wt[o]) / np.sum(wt)
+    return {"mean": float(np.sum(wt * v) / np.sum(wt)),
+            **{f"q{int(q * 100)}": float(v[o][min(np.searchsorted(cw, q), v.size - 1)]) for q in qs}}
+
+
+def descriptors(x, fm, w):
+    """Distributions (weighted by |m| and by rho) of r_s, s, s_sigma, q, alpha (total and per spin), w_x, w_c, zeta, and 2-D
+    |m| shares. These are SG15 valence (+ semicore) pseudo-densities. Conventions: k_F = (3 pi^2 rho)^(1/3),
+    s = |grad rho|/(2 k_F rho), q = lap rho/(4 k_F^2 rho); per spin with k_F,s = (6 pi^2 rho_s)^(1/3);
+    alpha = (tau - tau_W)/tau_unif, tau_unif = (3/10)(3 pi^2)^(2/3) rho^(5/3) d_s(zeta) (SCAN convention), per spin
+    alpha_s = (tau_s - tau_W,s)/((3/10)(6 pi^2)^(2/3) rho_s^(5/3))."""
+    tiny = 1e-300
+    r = x.rho.sum(0)
+    g = x.grad.sum(0)
+    t = x.tau.sum(0)
+    lap = x.lapl.sum(0)
+    z = (x.rho[0] - x.rho[1]) / np.maximum(r, tiny)
+    kf = (3 * np.pi ** 2 * r) ** (1 / 3)
+    gn = np.sqrt(np.sum(g ** 2, axis=0))
+    d = {"r_s": (3 / (4 * np.pi * np.maximum(r, tiny))) ** (1 / 3),
+         "s": gn / (2 * kf * np.maximum(r, tiny)),
+         "q": lap / (4 * kf ** 2 * np.maximum(r, tiny)),
+         "zeta": z}
+    ds = 0.5 * ((1 + z) ** (5 / 3) + (1 - z) ** (5 / 3))
+    tw = gn ** 2 / (8 * np.maximum(r, tiny))
+    d["alpha"] = (t - tw) / ((3 / 10) * (3 * np.pi ** 2) ** (2 / 3) * np.maximum(r, tiny) ** (5 / 3) * ds)
+    for sgn, sp in ((0, "up"), (1, "dn")):
+        rs_ = np.maximum(x.rho[sgn], tiny)
+        kfs = (6 * np.pi ** 2 * rs_) ** (1 / 3)
+        gs = np.sqrt(np.sum(x.grad[sgn] ** 2, axis=0))
+        d[f"s_{sp}"] = gs / (2 * kfs * rs_)
+        d[f"alpha_{sp}"] = (x.tau[sgn] - gs ** 2 / (8 * rs_)) / ((3 / 10) * (6 * np.pi ** 2) ** (2 / 3) * rs_ ** (5 / 3))
+    d["w_x_up"], d["w_x_dn"], d["w_c"], d["w_c_prime"] = fm["w_x_up"], fm["w_x_dn"], fm["w_c"], fm["w_c_prime"]
+    m = np.abs(x.rho[0] - x.rho[1])
+    wts = {"abs_m": w * m, "rho": w * r}
+    out = {"note": "SG15 valence (+ semicore) pseudo-densities", "quantiles": {k: {wn: _wq(v, wv) for wn, wv in wts.items()}
+                                                                              for k, v in d.items()}}
+    M = float(np.sum(w * m))
+    s_edges = (0.0, 0.25, 0.5, 1.0, 2.0, np.inf)
+    a_edges = (-np.inf, 0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, np.inf)
+    out["abs_m_share_rs_x_s"] = {f"rs{'<' if lo else '>='}0.75": [
+        {"s_lo": s_edges[b], "s_hi": s_edges[b + 1],
+         "share": float(np.sum((w * m)[((d['r_s'] < 0.75) == lo) & (d['s'] >= s_edges[b]) & (d['s'] < s_edges[b + 1])])) / M}
+        for b in range(len(s_edges) - 1)] for lo in (True, False)}
+    out["abs_m_share_alpha"] = [{"a_lo": a_edges[b], "a_hi": a_edges[b + 1],
+                                 "share": float(np.sum((w * m)[(d['alpha'] >= a_edges[b]) & (d['alpha'] < a_edges[b + 1])])) / M,
+                                 "rho_share": float(np.sum((w * r)[(d['alpha'] >= a_edges[b]) & (d['alpha'] < a_edges[b + 1])]))
+                                 / float(np.sum(w * r))} for b in range(len(a_edges) - 1)]
     return out
