@@ -21,6 +21,7 @@ Fe100 $B@rs0_pb=0
 Fe100 $B@ups_p=0.5
 Fe100 $B@rs0_pb=0.375
 Fe100 $B@rs0_pb=1.5
+Fe100 $B@d=0,rs0_pb=0
 Fe100-NM $B
 Fe100-NM SCH-SI-A:v3.1
 Fe100-NM $B@rs0_pb=0

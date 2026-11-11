@@ -60,7 +60,21 @@ def _pointwise(f, x):
         px = (xcu - xcd) / (xcu + xcd)
         W = jax_sc.payback_window(z, S.get("pb_zc"), S.get("pb_w"), S.get("pb_wmin", 0.0))
         frs = jax_sc.payback_rs_factor(rs, S.get("rs0", 0.0))
-        return ex, ec, rs, z, px, gp, W, frs
+        p0 = S.get("p0", jax_sc.P0_P)
+        GP = px * px / (px * px + p0 * p0)                                      # G_P (no alignment factor)
+        # the base switch and the two ends of the correlation hole, exactly as jax_sc.ec_density
+        wc, e_he, e_ueg = jax_sc.ueg_terms_reduced(ru, rd, gu, gd, tu, td, lu, ld, Pc)
+        e_flat = rho * jax_sc.eps_rational(rs, z, *jax_sc.slab_B(k, *jax_sc.hess_invariants(rh, gvn, Hu + Hd),
+                                                                   jax_sc.HESS_EPS), jax_sc.KAPPA)
+        su, _, _ = jax_sc.spin_switch_x(ru, gu, tu, lu, P)
+        sd_, _, _ = jax_sc.spin_switch_x(rd, gd, td, ld, P)
+        q = 1 - 1 / jnp.sqrt(1 + rs / S["r_q"])
+        qs = rs / (rs + S["r_q"])
+        sc = (ru * su + rd * sd_) / rh
+        cc = (1 - sc) * q + sc * qs
+        e_iso = (1 - cc) * e_he + cc * e_flat
+        dw = (1 - wc) * S.get("ups_p", 0.0) * gp * W * frs                     # w'_c - w_c
+        return ex, ec, rs, z, px, gp, W, frs, GP, c2, 1 - wc, dw, e_iso - e_ueg
 
     out = jax.jit(kernel)(x.rho[0], x.rho[1], x.grad[0], x.grad[1], x.tau[0], x.tau[1], x.lapl[0], x.lapl[1],
                           x.hess[0], x.hess[1])
@@ -73,6 +87,22 @@ def _bins(key, edges, weights):
             for b in range(len(edges) - 1)]
 
 
+def _factor_stats(fields, weights):
+    """For each factor: weighted mean and weighted quantiles (10, 25, 50, 75, 90 %) under each weight."""
+    out = {}
+    for name, v in fields.items():
+        v = np.asarray(v).reshape(-1)
+        out[name] = {}
+        order = np.argsort(v)
+        for wn, wv in weights.items():
+            wv = np.asarray(wv).reshape(-1)
+            cw = np.cumsum(wv[order]) / np.sum(wv)
+            out[name][wn] = {"mean": float(np.sum(wv * v) / np.sum(wv)),
+                             **{f"q{int(q * 100)}": float(v[order][min(np.searchsorted(cw, q), v.size - 1)])
+                                for q in (0.1, 0.25, 0.5, 0.75, 0.9)}}
+    return out
+
+
 def attribution(functional_name, grid, rho, tau):
     """Frozen attribution on one density (root only). functional_name: B (installed) or a B variant."""
     from ..functional import get
@@ -82,7 +112,7 @@ def attribution(functional_name, grid, rho, tau):
     edits["ups_p"] = 0.0
     f0 = get(base + "@" + ",".join(f"{k}={v}" for k, v in edits.items()))
     x, _ = point_inputs(grid, rho, tau, True, True)
-    exB, ecB, rs, z, px, gp, W, frs = _pointwise(fB, x)
+    exB, ecB, rs, z, px, gp, W, frs, GP, ctheta, one_m_wc, dw, lever = _pointwise(fB, x)
     ex0, ec0, *_ = _pointwise(f0, x)
     w = grid.weight
     ups = float(fB._S["ups_p"])
@@ -102,6 +132,11 @@ def attribution(functional_name, grid, rho, tau):
                             "W_zeta": float(np.sum(w * m * W)) / M, "ups_gP_W_f": float(np.sum(w * m * act)) / M,
                             "rs": float(np.sum(w * m * rs)) / M, "abs_Px": float(np.sum(w * m * np.abs(px))) / M},
         "bins_rs": _bins(rs, RS_EDGES, wts), "bins_zeta": _bins(z, ZETA_EDGES, wts), "bins_Px": _bins(px, PX_EDGES, wts),
+        "factors": _factor_stats({"G_P": GP, "c_theta": ctheta, "g_P": gp, "W_zeta": W, "f_rs": frs, "one_minus_wc": one_m_wc,
+                                  "dw_switch_shift": dw, "lever_e_iso_minus_e_ueg_HaPerBohr3": lever,
+                                  "lever_per_electron_Ha": lever / np.maximum(x.rho[0] + x.rho[1], 1e-300),
+                                  "dw_x_lever_HaPerBohr3": dw * lever},
+                                 {"abs_m": w * m, "rho": w * (x.rho[0] + x.rho[1])}),
         "quantiles_abs_m_weighted": {},
     }
     order = np.argsort(rs)
@@ -113,7 +148,7 @@ def attribution(functional_name, grid, rho, tau):
 RY_TO_MEV = 13605.693122994
 
 ROWS = ("SCH-SI-B:v3.1", "SCH-SI-B:v3.1@ups_p=0", "SCH-SI-B:v3.1@ups_p=0.5", "SCH-SI-B:v3.1@rs0_pb=0",
-        "SCH-SI-B:v3.1@rs0_pb=0.375", "SCH-SI-B:v3.1@rs0_pb=1.5", "SCH-SI-A:v3.1")   # no PBE: computed once in M1, banked
+        "SCH-SI-B:v3.1@rs0_pb=0.375", "SCH-SI-B:v3.1@rs0_pb=1.5", "SCH-SI-B:v3.1@d=0,rs0_pb=0", "SCH-SI-A:v3.1")   # no PBE: computed once in M1, banked
 
 
 def table(root):

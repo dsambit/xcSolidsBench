@@ -163,8 +163,11 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
                    fermi_ry=s.fermi_level(), eigenvalues_ry=et.tolist(), kweights=wk.tolist())
         if rank == 0:
             rec.update(e_xc_final_ry=2 * res.e_xc, density_stats=res.stats)
-            if post is not None:
-                rec["post"] = post(s.grid, rho, tau)
+            if post is not None:                         # a diagnostic: its failure is recorded, the SCF result stands
+                try:
+                    rec["post"] = post(s.grid, rho, tau)
+                except Exception as exc:
+                    rec["post"] = {"error": f"{type(exc).__name__}: {exc}", "traceback": traceback.format_exc()}
     except Exception as exc:
         rec.update(status="failed", error=f"{type(exc).__name__}: {exc}", traceback=traceback.format_exc())
         if rank == 0:
