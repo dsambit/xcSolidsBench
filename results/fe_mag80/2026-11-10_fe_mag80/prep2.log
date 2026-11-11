@@ -1,0 +1,63 @@
+/pscratch/sd/d/dsambit/xc_functional_dev/src/xcSolidsBench/src/xcsb/cli.py:80: ExternalRecordWarning: external SCH-SI record (dict): He and T norms re-solved: norms absent (c1 0.4564504058, r_q 24.42543571, r_q_T 26.81554107, kappa_T 0.6296842713)
+  print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+{"name": "SCH-SI-B:v3.1@lam=0.8", "cache": "/pscratch/sd/d/dsambit/xc_functional_dev/cache/xchole_norms/SCH-SI-B_v3.1_2fef615f928cad8b.json"}
+/pscratch/sd/d/dsambit/xc_functional_dev/src/xcSolidsBench/src/xcsb/cli.py:80: ExternalRecordWarning: external SCH-SI record (dict): He and T norms re-solved: norms absent (c1 0.4564504058, r_q 24.42543571, r_q_T 26.81554107, kappa_T 0.6296842713)
+  print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+{"name": "SCH-SI-B:v3.1@eps=0.001", "cache": "/pscratch/sd/d/dsambit/xc_functional_dev/cache/xchole_norms/SCH-SI-B_v3.1_8f990e4bd2517639.json"}
+/pscratch/sd/d/dsambit/xc_functional_dev/src/xcSolidsBench/src/xcsb/cli.py:80: ExternalRecordWarning: external SCH-SI record (dict): He and T norms re-solved: norms absent (c1 0.4564504058, r_q 24.42543571, r_q_T 26.81554107, kappa_T 0.6296842713)
+  print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+{"name": "SCH-SI-B:v3.1@nc_kd=2.0", "cache": "/pscratch/sd/d/dsambit/xc_functional_dev/cache/xchole_norms/SCH-SI-B_v3.1_99ad7ca715cf528f.json"}
+/pscratch/sd/d/dsambit/xc_functional_dev/src/xcSolidsBench/src/xcsb/cli.py:80: ExternalRecordWarning: external SCH-SI record (dict): He and T norms re-solved: norms absent (c1 0.4564504058, r_q 24.42543571, r_q_T 26.81554107, kappa_T 0.6296842713)
+  print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+{"name": "SCH-SI-B:v3.1@a_L=3.0", "cache": "/pscratch/sd/d/dsambit/xc_functional_dev/cache/xchole_norms/SCH-SI-B_v3.1_67f065e6de7d38b0.json"}
+/pscratch/sd/d/dsambit/xc_functional_dev/src/xcSolidsBench/src/xcsb/cli.py:80: ExternalRecordWarning: external SCH-SI record (dict): He and T norms re-solved: norms absent (c1 0.4614994516, r_q 23.38469344, r_q_T 25.453476, kappa_T 0.6296842713)
+  print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+{"name": "SCH-SI-B:v3.1@nc_ke=2.0", "cache": "/pscratch/sd/d/dsambit/xc_functional_dev/cache/xchole_norms/SCH-SI-B_v3.1_ef19eec0e243abd7.json"}
+/pscratch/sd/d/dsambit/xc_functional_dev/src/xcSolidsBench/src/xcsb/cli.py:80: ExternalRecordWarning: external SCH-SI record (dict): He and T norms re-solved: norms absent (c1 0.4518606959, r_q 25.45166868, r_q_T 28.17297203, kappa_T 0.6296842713)
+  print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+{"name": "SCH-SI-B:v3.1@nc_ke=10.0", "cache": "/pscratch/sd/d/dsambit/xc_functional_dev/cache/xchole_norms/SCH-SI-B_v3.1_c6b2e10c73c222d4.json"}
+/pscratch/sd/d/dsambit/xc_functional_dev/src/xcSolidsBench/src/xcsb/cli.py:80: ExternalRecordWarning: external SCH-SI record (dict): He and T norms re-solved: norms absent (c1 0.4564504058, r_q 24.42543571, r_q_T 26.81554107, kappa_T 0.6296842713)
+  print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+{"name": "SCH-SI-B:v3.1@nc_kd=15.0", "cache": "/pscratch/sd/d/dsambit/xc_functional_dev/cache/xchole_norms/SCH-SI-B_v3.1_1b1c38106030b84a.json"}
+/pscratch/sd/d/dsambit/xc_functional_dev/src/xcSolidsBench/src/xcsb/cli.py:80: ExternalRecordWarning: external SCH-SI record (dict): He and T norms re-solved: norms absent (c1 0.4564504058, r_q 24.42543571, r_q_T 26.81554107, kappa_T 0.6296842713)
+  print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+{"name": "SCH-SI-B:v3.1@beta_g=0.3", "cache": "/pscratch/sd/d/dsambit/xc_functional_dev/cache/xchole_norms/SCH-SI-B_v3.1_30674b71bc103db5.json"}
+/pscratch/sd/d/dsambit/xc_functional_dev/src/xcSolidsBench/src/xcsb/cli.py:80: ExternalRecordWarning: external SCH-SI record (dict): He and T norms re-solved: norms absent (c1 0.5095125772, r_q 24.42530383, r_q_T 26.81554107, kappa_T 0.6296842713)
+  print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+{"name": "SCH-SI-B:v3.1@r_c=5.0", "cache": "/pscratch/sd/d/dsambit/xc_functional_dev/cache/xchole_norms/SCH-SI-B_v3.1_1fa374e06513043f.json"}
+/pscratch/sd/d/dsambit/xc_functional_dev/src/xcSolidsBench/src/xcsb/cli.py:80: ExternalRecordWarning: external SCH-SI record (dict): He and T norms re-solved: norms absent (c1 0.4564504058, r_q 24.42543571, r_q_T 26.81554107, kappa_T 0.6296842713)
+  print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+{"name": "SCH-SI-B:v3.1@a_c=0.3", "cache": "/pscratch/sd/d/dsambit/xc_functional_dev/cache/xchole_norms/SCH-SI-B_v3.1_3acc948aaabc6ac5.json"}
+/pscratch/sd/d/dsambit/xc_functional_dev/src/xcSolidsBench/src/xcsb/cli.py:80: ExternalRecordWarning: external SCH-SI record (dict): He and T norms re-solved: norms absent (c1 0.451848191, r_q 25.45166871, r_q_T 28.13544445, kappa_T 0.6299086233)
+  print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+{"name": "SCH-SI-A:v3.1@lam=0.8", "cache": "/pscratch/sd/d/dsambit/xc_functional_dev/cache/xchole_norms/SCH-SI-A_v3.1_82a2bfe59c24cde6.json"}
+/pscratch/sd/d/dsambit/xc_functional_dev/src/xcSolidsBench/src/xcsb/cli.py:80: ExternalRecordWarning: external SCH-SI record (dict): He and T norms re-solved: norms absent (c1 0.4564504058, r_q 24.42543571, r_q_T 26.81554107, kappa_T 0.6296842713)
+  print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+{"name": "SCH-SI-B:v3.1@a_c=4.0", "cache": "/pscratch/sd/d/dsambit/xc_functional_dev/cache/xchole_norms/SCH-SI-B_v3.1_be1a7ea5557d64df.json"}
+/pscratch/sd/d/dsambit/xc_functional_dev/src/xcSolidsBench/src/xcsb/cli.py:80: ExternalRecordWarning: external SCH-SI record (dict): He and T norms re-solved: norms absent (c1 0.451848191, r_q 25.45166871, r_q_T 28.13544445, kappa_T 0.6299086233)
+  print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+{"name": "SCH-SI-A:v3.1@a_L=3.0", "cache": "/pscratch/sd/d/dsambit/xc_functional_dev/cache/xchole_norms/SCH-SI-A_v3.1_ffcde818f9a9cc5b.json"}
+/pscratch/sd/d/dsambit/xc_functional_dev/src/xcSolidsBench/src/xcsb/cli.py:80: ExternalRecordWarning: external SCH-SI record (dict): He and T norms re-solved: norms absent (c1 0.451848191, r_q 25.45166871, r_q_T 28.13544445, kappa_T 0.6299086233)
+  print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+{"name": "SCH-SI-A:v3.1@eps=0.001", "cache": "/pscratch/sd/d/dsambit/xc_functional_dev/cache/xchole_norms/SCH-SI-A_v3.1_e10dcf75f184be96.json"}
+/pscratch/sd/d/dsambit/xc_functional_dev/src/xcSolidsBench/src/xcsb/cli.py:80: ExternalRecordWarning: external SCH-SI record (dict): He and T norms re-solved: norms absent (c1 0.451848191, r_q 25.45166871, r_q_T 28.13544445, kappa_T 0.6299086233)
+  print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+{"name": "SCH-SI-A:v3.1@nc_kd=2.0", "cache": "/pscratch/sd/d/dsambit/xc_functional_dev/cache/xchole_norms/SCH-SI-A_v3.1_e1e5b36a6af0e6d7.json"}
+/pscratch/sd/d/dsambit/xc_functional_dev/src/xcSolidsBench/src/xcsb/cli.py:80: ExternalRecordWarning: external SCH-SI record (dict): He and T norms re-solved: norms absent (c1 0.451848191, r_q 25.45166871, r_q_T 28.13544445, kappa_T 0.6299086233)
+  print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+{"name": "SCH-SI-A:v3.1@eps=0.01", "cache": "/pscratch/sd/d/dsambit/xc_functional_dev/cache/xchole_norms/SCH-SI-A_v3.1_33ea7bbd3671493a.json"}
+/pscratch/sd/d/dsambit/xc_functional_dev/src/xcSolidsBench/src/xcsb/cli.py:80: ExternalRecordWarning: external SCH-SI record (dict): He and T norms re-solved: norms absent (c1 0.451848191, r_q 25.45166871, r_q_T 28.13544445, kappa_T 0.6299086233)
+  print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+{"name": "SCH-SI-A:v3.1@nc_kd=15.0", "cache": "/pscratch/sd/d/dsambit/xc_functional_dev/cache/xchole_norms/SCH-SI-A_v3.1_8096fe9e881832a4.json"}
+/pscratch/sd/d/dsambit/xc_functional_dev/src/xcSolidsBench/src/xcsb/cli.py:80: ExternalRecordWarning: external SCH-SI record (dict): He and T norms re-solved: norms absent (c1 0.4614869394, r_q 23.38469347, r_q_T 25.41951777, kappa_T 0.6299086233)
+  print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+{"name": "SCH-SI-A:v3.1@nc_ke=2.0", "cache": "/pscratch/sd/d/dsambit/xc_functional_dev/cache/xchole_norms/SCH-SI-A_v3.1_a5b13be94b7530e4.json"}
+/pscratch/sd/d/dsambit/xc_functional_dev/src/xcSolidsBench/src/xcsb/cli.py:80: ExternalRecordWarning: external SCH-SI record (dict): He and T norms re-solved: norms absent (c1 0.451848191, r_q 25.45166871, r_q_T 28.13544445, kappa_T 0.6299086233)
+  print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+{"name": "SCH-SI-A:v3.1@beta_g=0.3", "cache": "/pscratch/sd/d/dsambit/xc_functional_dev/cache/xchole_norms/SCH-SI-A_v3.1_12df9fab41794635.json"}
+/pscratch/sd/d/dsambit/xc_functional_dev/src/xcSolidsBench/src/xcsb/cli.py:80: ExternalRecordWarning: external SCH-SI record (dict): He and T norms re-solved: norms absent (c1 0.504323538, r_q 25.45153274, r_q_T 28.13544445, kappa_T 0.6299086233)
+  print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+{"name": "SCH-SI-A:v3.1@r_c=5.0", "cache": "/pscratch/sd/d/dsambit/xc_functional_dev/cache/xchole_norms/SCH-SI-A_v3.1_8122e8e17424b31b.json"}
+/pscratch/sd/d/dsambit/xc_functional_dev/src/xcSolidsBench/src/xcsb/cli.py:80: ExternalRecordWarning: external SCH-SI record (dict): He and T norms re-solved: norms absent (c1 0.451848191, r_q 25.45166871, r_q_T 28.13544445, kappa_T 0.6299086233)
+  print(json.dumps({"name": n, "cache": prepare_variant(n)}), flush=True)
+{"name": "SCH-SI-A:v3.1@a_c=0.3", "cache": "/pscratch/sd/d/dsambit/xc_functional_dev/cache/xchole_norms/SCH-SI-A_v3.1_a2431ac40a8ea252.json"}

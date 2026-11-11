@@ -1,0 +1,15 @@
+{
+ "python": "3.12.16",
+ "numpy": "2.4.6",
+ "scipy": "1.18.1",
+ "jax": "0.11.2",
+ "pyscf": "2.14.0",
+ "libxc": "7.0.0",
+ "mpi4py": "4.1.2",
+ "mpi": "MPI VERSION    : CRAY MPICH version 9.1.0.794 (ANL base 4.3.0a1)",
+ "qepy_file": "/pscratch/sd/d/dsambit/xc_functional_dev/envs/xcsb/lib/python3.12/site-packages/qepy/__init__.py",
+ "qe_commit": "9f93ddec427d2b9a45bb72d828c6d324f62fcabd",
+ "qepy_commit": "eb03de776a0f898bdcf408be62caaa52d6893c59",
+ "patch_sha256": "fae7f62df2a006b53d4f4e7446ee4ea56364fb3cee074f548889f23d3650d7fe",
+ "xcsb_commit": "2497f1493b80f7c3ca25064fff19208b345c8404"
+}

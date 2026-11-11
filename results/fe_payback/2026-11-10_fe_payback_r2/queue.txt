@@ -1,0 +1,11 @@
+Fe100 SCH-SI-B:v3.1 --payback-diag
+Fe100 SCH-SI-A:v3.1
+Fe100 SCH-SI-B:v3.1@ups_p=0
+Fe100 SCH-SI-B:v3.1@rs0_pb=0
+Fe100 SCH-SI-B:v3.1@ups_p=0.5
+Fe100 SCH-SI-B:v3.1@rs0_pb=0.375
+Fe100 SCH-SI-B:v3.1@rs0_pb=1.5
+Fe100 SCH-SI-B:v3.1@d=0,rs0_pb=0
+Fe100-NM SCH-SI-B:v3.1
+Fe100-NM SCH-SI-A:v3.1
+Fe100-NM SCH-SI-B:v3.1@rs0_pb=0

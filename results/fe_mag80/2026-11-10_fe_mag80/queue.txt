@@ -1,0 +1,43 @@
+Fe80 SCH-SI-B:v3.1 --mag-split --payback-diag
+Fe80 SCH-SI-A:v3.1 --mag-split
+Fe80 SCH-SI-B:v3.1#ueg-end
+Fe80 SCH-SI-A:v3.1#ueg-end
+Fe80 SCH-SI-B:v3.1@d=0.5
+Fe80 SCH-SI-B:v3.1@d=1.0
+Fe80 SCH-SI-B:v3.1@d=0 --maxiter 400 --payback-diag
+Fe80 SCH-SI-B:v3.1@lam=0.8
+Fe80 SCH-SI-B:v3.1@a_L=3.0
+Fe80 SCH-SI-B:v3.1@eps=0.001
+Fe80 SCH-SI-B:v3.1@c_min=0.1
+Fe80 SCH-SI-B:v3.1@nc_kd=2.0
+Fe80 SCH-SI-B:v3.1@nc_kd=15.0
+Fe80 SCH-SI-B:v3.1@nc_ke=2.0
+Fe80 SCH-SI-B:v3.1@nc_ke=10.0
+Fe80 SCH-SI-B:v3.1@beta_g=0.3
+Fe80 SCH-SI-B:v3.1@r_c=5.0
+Fe80 SCH-SI-B:v3.1@a_c=0.3
+Fe80 SCH-SI-B:v3.1@a_c=4.0
+Fe80 SCH-SI-B:v3.1@kappa_r=0.0059
+Fe80 SCH-SI-B:v3.1@t_H=0.01
+Fe80 SCH-SI-B:v3.1@t_H=1.0
+Fe80 SCH-SI-B:v3.1@y_w=1e-08
+Fe80 SCH-SI-B:v3.1@y_w=100000000.0
+Fe80 SCH-SI-B:v3.1@b_rise=1.0
+Fe80 SCH-SI-A:v3.1@lam=0.8
+Fe80 SCH-SI-A:v3.1@a_L=3.0
+Fe80 SCH-SI-A:v3.1@eps=0.001
+Fe80 SCH-SI-A:v3.1@eps=0.01
+Fe80 SCH-SI-A:v3.1@c_min=0.11
+Fe80 SCH-SI-A:v3.1@nc_kd=2.0
+Fe80 SCH-SI-A:v3.1@nc_kd=15.0
+Fe80 SCH-SI-A:v3.1@nc_ke=2.0
+Fe80 SCH-SI-A:v3.1@beta_g=0.3
+Fe80 SCH-SI-A:v3.1@r_c=5.0
+Fe80 SCH-SI-A:v3.1@a_c=0.3
+Fe80 SCH-SI-A:v3.1@kappa_r=0.0059
+Fe80 SCH-SI-A:v3.1@t_H=0.01
+Fe80 SCH-SI-A:v3.1@t_H=1.0
+Fe80 SCH-SI-A:v3.1@y_w=1e-08
+Fe80 SCH-SI-A:v3.1@y_w=100000000.0
+Fe80 SCH-SI-A:v3.1@b_rise=0.0
+Fe80 SCH-SI-A:v3.1@b_rise=1.0

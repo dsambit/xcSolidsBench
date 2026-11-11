@@ -1,0 +1,9 @@
+{"functional": "SCH-SI-B:v3.1", "status": "ok", "m_total": 2.7455156096197166, "m_abs": 2.946869634711013, "etot_ry": -236.80885747012832, "iterations": 29, "carrier_iterations": 20}
+{"functional": "SCH-SI-B:v3.1@ups_p=0", "status": "ok", "m_total": 2.750611308913736, "m_abs": 3.06236860176088, "etot_ry": -236.82393442375613, "iterations": 19, "carrier_iterations": 20}
+{"functional": "SCH-SI-B:v3.1@ups_p=0.5", "status": "ok", "m_total": 2.74846479765312, "m_abs": 3.000013696771254, "etot_ry": -236.81571792314318, "iterations": 18, "carrier_iterations": 20}
+{"functional": "SCH-SI-B:v3.1@rs0_pb=0", "status": "failed"}
+{"functional": "SCH-SI-B:v3.1@rs0_pb=0.375", "status": "ok", "m_total": 2.729716329347128, "m_abs": 2.9066430155565257, "etot_ry": -236.80335983506052, "iterations": 51, "carrier_iterations": 20}
+{"functional": "SCH-SI-B:v3.1@rs0_pb=1.5", "status": "ok", "m_total": 2.7527651751792224, "m_abs": 2.986242965598912, "etot_ry": -236.81465373538842, "iterations": 20, "carrier_iterations": 20}
+{"functional": "SCH-SI-B:v3.1@d=0,rs0_pb=0", "status": "failed"}
+{"functional": "SCH-SI-A:v3.1", "status": "ok", "m_total": 2.7671574076151204, "m_abs": 3.100904855226024, "etot_ry": -236.85854918334178, "iterations": 18, "carrier_iterations": 20}
+{}
