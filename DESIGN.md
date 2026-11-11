@@ -583,6 +583,17 @@ batch jobs would need the user's permission (Q7).
 
 ---
 
+## 9b. M0 status (2026-11-10)
+
+Implemented and verified (results/m0/, tier summaries; node runs at QE 9f93ddec, QEpy eb03de77 + patch fae7f62d):
+V1, V2a, V2b pass for the test functional, PBE, r2SCAN, TPSS and SCH-SI-A/B:v3.1 (handoff sanity points to 1e-10);
+V3 passes for PBE (Si, Fe nspin 2) and TPSS on Si-lowsym; the host E_xc check passes on every native density after removing
+QE's meta threshold points; on Fe-offset TPSS (nspin 2) energy and host E_xc pass but the moment (3.3e-4 μB) and occupied
+eigenvalues (4e-5 Ry) differ by more than the tolerance (open: QE's native spin-polarized TPSS potential vs libxc's;
+our potential passes V2 per spin); V4, V5 (bitwise, 8 and 32 ranks), V6 (Si, Fe; PBE, r2SCAN, SCH-SI-A, -B) pass.
+Findings fixed during M0: the SCF start (carrier converged in the same session), Gaussian smearing (occupations in [0, 1]),
+convergence = conv_elec, one SCF per process (QE keeps functional state between QEpy Drivers), QE's meta-GGA thresholds.
+
 ## 10. Open questions for the user
 
 - Q1. License of this repository (QEpy is GPL-2; we ship only a patch to it).
