@@ -35,12 +35,15 @@ def main(argv=None):
     s.add_argument("--name", required=True)
     s.add_argument("--root", required=True)
     s.add_argument("--host-check")
+    s.add_argument("--payback-diag", action="store_true", help="frozen payback attribution on the converged density")
     c = sub.add_parser("compare", help="tier verdicts from the SCF records")
     c.add_argument("tier", choices=["v3", "v4", "v6"])
     c.add_argument("--root", required=True)
     t = sub.add_parser("tier", help="V5 (host-step bitwise MPI check)")
     t.add_argument("tier", choices=["v5"])
     t.add_argument("--out", required=True)
+    pt = sub.add_parser("payback-table", help="the Fe payback diagnostic table (xcsb.studies.fe_payback)")
+    pt.add_argument("--root", required=True)
     r = sub.add_parser("run", help="one hooked SCF from a TOML case file")
     r.add_argument("case")
     r.add_argument("--functional", required=True)
@@ -51,7 +54,7 @@ def main(argv=None):
 
         from . import tiers
         out = tiers.run_dir(a.root, a.case, a.mode, a.name)
-        rec = tiers.scf(a.case, a.mode, a.name, out, a.host_check)
+        rec = tiers.scf(a.case, a.mode, a.name, out, a.host_check, a.payback_diag)
         ok = MPI.COMM_WORLD.bcast(rec.get("status") == "ok", root=0)
         if MPI.COMM_WORLD.Get_rank() == 0:
             print(json.dumps({"case": a.case, "mode": a.mode, "name": a.name, "status": rec.get("status"),
@@ -63,6 +66,14 @@ def main(argv=None):
         json.dump(res, open(os.path.join(a.root, f"{a.tier.upper()}.json"), "w"), indent=1, default=float)
         print(json.dumps({"tier": a.tier, "pass": res["pass"]}))
         return 0 if res["pass"] else 1
+    if a.cmd == "payback-table":
+        from .studies import fe_payback
+        res = fe_payback.table(a.root)
+        json.dump(res, open(os.path.join(a.root, "payback_table.json"), "w"), indent=1, default=float)
+        for row in res["rows"]:
+            print(json.dumps(row, default=float))
+        print(json.dumps(res["nm_check"]))
+        return 0
     if a.cmd == "tier":
         from mpi4py import MPI
 

@@ -68,26 +68,63 @@ def import_pinned_xchole():
     return xchole, commit
 
 
+def parse_variant(name: str):
+    """'SCH-SI-B:v3.1@ups_p=0.5,rs0_pb=0' -> ('SCH-SI-B:v3.1', {'ups_p': 0.5, 'rs0_pb': 0.0}); no '@': no edits."""
+    base, _, spec = name.partition("@")
+    edits = {}
+    for item in filter(None, spec.split(",")):
+        k, _, v = item.partition("=")
+        edits[k.strip()] = float(v)
+    return base, edits
+
+
 class XcholeFunctional(PointFunctional):
+    """An installed v3.1 set, or a DIAGNOSTIC variant of it with edited theta fields (name 'SET@key=value,...').
+    Variants may edit only theta fields that the cached norms do not depend on (xchole registry.HASH_EXCLUDE, e.g. the
+    payback's ups_p, rs0_pb), so the record's cached norms stay valid; the model is built with xchole's public
+    params.candidate_params / params.of_record / jax_si.ModelXC_SCHSI (exactly as SCHSIFunctional.build_model), which
+    validate the record (ranges, per-set P0, d_hash, m_hash) and raise. A variant is never a published parameter set."""
     uses_laplacian = True
     uses_hessian = True
 
     def __init__(self, name: str):
-        if name not in RECORD_SHA256:
-            raise KeyError(f"{name!r}: only the pinned v3.1 sets {sorted(RECORD_SHA256)}")
+        base, edits = parse_variant(name)
+        if base not in RECORD_SHA256:
+            raise KeyError(f"{base!r}: only the pinned v3.1 sets {sorted(RECORD_SHA256)}")
         xchole, commit = import_pinned_xchole()
-        import xchole.benchmarks.functionals as F
-        from xchole.sch_si import params
-        fname, sha = RECORD_SHA256[name]
+        import copy
+        import json
+        from xchole.sch_si import params, registry
+        from xchole.sch_si.jax_si import ModelXC_SCHSI
+        fname, sha = RECORD_SHA256[base]
         path = os.path.join(params.PARAMS_DIR, fname)
-        digest = hashlib.sha256(open(path, "rb").read()).hexdigest()
+        raw = open(path, "rb").read()
+        digest = hashlib.sha256(raw).hexdigest()
         if digest != sha:
             raise XcholePinError(f"{path}: sha256 {digest} != pinned {sha}")
+        rec = json.loads(raw)
+        bad = sorted(set(edits) - set(registry.HASH_EXCLUDE))
+        if bad:
+            raise ValueError(f"{name}: {bad} enter the cached norms (not in registry.HASH_EXCLUDE): a variant would need a norm "
+                             f"re-solve; not supported here")
+        missing = sorted(set(edits) - set(rec["best"]["theta"]))
+        if missing:
+            raise KeyError(f"{name}: {missing} are not theta fields of {fname}")
+        rec = copy.deepcopy(rec)
+        rec["best"]["theta"].update(edits)
+        r2, si = params.of_record(rec)
+        from xchole.sch_si.jax_sc import sc_dict
+        xp, cp, scp = params.candidate_params(r2)
         self.name = name
-        self._f = F.get(name)
-        self._model = self._f.build_model()
-        self._prov = {"name": name, "kind": "xchole", "xchole_commit": commit, "record": fname, "record_sha256": digest,
-                      "label": self._f.label}
+        self._model = ModelXC_SCHSI(xp, cp, scp, si)
+        self._S = sc_dict(scp)                     # as ModelXC_SCHSI passes them to make_energy_si (diagnostics only)
+        self._si = dict(r_c=si.r_c, s_w=si.s_w, b_g=si.b_g, t_G=si.t_G, r_q_T=si.r_q_T, kappa_T=si.kappa_T,
+                        kappa_G=si.kappa_G)
+        self._prov = {"name": name, "kind": "xchole" if not edits else "xchole diagnostic variant", "xchole_commit": commit,
+                      "record": fname, "record_sha256": digest, "theta_edits": edits,
+                      "norms": "cached (edited fields are norm-independent: registry.HASH_EXCLUDE)",
+                      "published_set": not edits}
+        self.record = rec
 
     @property
     def provenance(self) -> dict:

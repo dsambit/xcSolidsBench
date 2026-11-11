@@ -95,7 +95,9 @@ def run_native(case: Case, input_dft: str, workdir: str, comm, host_functional: 
 
 
 def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path: str | None = None,
-               maxiter: int = settings.MAXITER, chunk: int = CHUNK) -> dict:
+               maxiter: int = settings.MAXITER, chunk: int = CHUNK, post=None) -> dict:
+    """post: optional diagnostic called on the root with (grid, rho, tau) of the converged density; its dict is stored
+    as rec["post"] (e.g. xcsb.studies.fe_payback.attribution)."""
     t0 = time.time()
     rank = comm.Get_rank()
     f = get_functional(functional_name)
@@ -161,6 +163,8 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
                    fermi_ry=s.fermi_level(), eigenvalues_ry=et.tolist(), kweights=wk.tolist())
         if rank == 0:
             rec.update(e_xc_final_ry=2 * res.e_xc, density_stats=res.stats)
+            if post is not None:
+                rec["post"] = post(s.grid, rho, tau)
     except Exception as exc:
         rec.update(status="failed", error=f"{type(exc).__name__}: {exc}", traceback=traceback.format_exc())
         if rank == 0:

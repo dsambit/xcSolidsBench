@@ -72,14 +72,19 @@ CASES = {
 
 
 # ---- one SCF per process ----------------------------------------------------------------------------------------------
-def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None = None):
+def all_cases():
+    from .studies import fe_payback
+    return {**CASES, **fe_payback.CASES}
+
+
+def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None = None, payback_diag: bool = False):
     """mode 'native': QE's input_dft = name (host_check: a libxc name for the host E_xc of the native density);
     mode 'hooked': the functional `name` through the hooks. Writes <out>/record.json."""
     from mpi4py import MPI
 
     from .scf.driver import _write, run_hooked, run_native
     comm = MPI.COMM_WORLD
-    case = CASES[case_name]()
+    case = all_cases()[case_name]()
     rec_path = os.path.join(out, "record.json")
     if mode == "native":
         try:
@@ -91,7 +96,11 @@ def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None =
             _write(rec_path, rec)
     else:
         try:
-            rec = run_hooked(case, name, out, comm, record_path=rec_path)
+            post = None
+            if payback_diag:
+                from .studies.fe_payback import attribution
+                post = lambda g, r, t: attribution(name, g, r, t)          # noqa: E731
+            rec = run_hooked(case, name, out, comm, record_path=rec_path, post=post)
         except Exception as exc:
             rec = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"}
     rec["case_name"] = case_name
@@ -99,7 +108,8 @@ def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None =
 
 
 def run_dir(root, case_name, mode, name):
-    return os.path.join(root, f"{case_name}__{mode}__{name.replace(':', '_')}")
+    safe = name.replace(":", "_").replace("@", "__").replace(",", "_").replace("=", "")
+    return os.path.join(root, f"{case_name}__{mode}__{safe}")
 
 
 def _load(root, case_name, mode, name):

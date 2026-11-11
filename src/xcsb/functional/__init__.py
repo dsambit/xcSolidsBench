@@ -11,7 +11,7 @@ def get(name: str) -> PointFunctional:
     """PBE, r2SCAN, SCAN, TPSS (libxc); SCH-SI-A:v3.1, SCH-SI-B:v3.1 (xchole at the pin); model:test (synthetic)."""
     if name in LIBXC_CODES:
         return LibxcFunctional(name)
-    if name in XCHOLE_NAMES:
+    if name.split("@")[0] in XCHOLE_NAMES:
         from .xchole import XcholeFunctional
         return XcholeFunctional(name)
     if name == "model:test":
