@@ -1,14 +1,19 @@
 #!/bin/bash
 # M1 step 1, the cutoff ladder of bcc Fe and V (DESIGN.md Sec. 6.2; xcsb.studies.m1_ladder). Inside ONE 1-node allocation;
 # resumable, and several allocations (at most 2 at a time) may work on the same run directory (task claims).
-#   bash scripts/perlmutter/job_m1_ladder.sh <run dir>
-# Phase 0 (first allocation only; ~10 min): QE k-point pools (npool 8 vs 1, PBE and SCH-SI-B, Fe 40 Ry 8^3 k) must give the
-# same SCF, and the ripple-seeded restart must run (PBE, all six seeds); a failure STOPS the job. Then the campaign runner:
-# stage P (PBE scan, E_c^PBE), then stage L (ladder, d = 8 points, ripple seeds at the top rung), until the deadline.
+#   bash scripts/perlmutter/job_m1_ladder.sh <run dir> P|L
+# Stage P (user 2026-11-11: the first allocation runs this ONLY, then stops and reports): phase 0 (~10 min: QE k-point pools,
+# npool 8 vs 1 for PBE and SCH-SI-B, Fe 40 Ry 8^3 k, must give the same SCF; the ripple-seeded restart must run, PBE, all six
+# seeds; a failure STOPS the job), then the PBE scan 40-140 Ry (E_c^PBE -> EC.json) and the full-node probe, then the report
+# stage_p_report.{json,md} (measured times with pools, revised stage-L node-hours). Stage L (only after the user's decision;
+# needs phase 0 PASS and EC.json): the ladder, the d = 8 points and the ripple seeds, until the deadline. The runner never
+# starts a task of the other stage.
 set -uo pipefail
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 source "$REPO/scripts/perlmutter/env_xcsb.sh"
 RUN=${1:?run dir}
+STAGE=${2:?stage P or L}
+case $STAGE in P|L) ;; *) echo "stage must be P or L, got $STAGE" >&2; exit 2;; esac
 mkdir -p "$RUN"
 cd "$REPO"
 JOB=${SLURM_JOB_ID:-nojob}
@@ -18,10 +23,13 @@ echo "$JOB $(git rev-parse HEAD) $(date -Is)" >> "$RUN/COMMITS"
 git -C "$(dirname "$XCSB_XCHOLE_SRC")" rev-parse HEAD > "$RUN/XCHOLE_COMMIT"
 export OMP_NUM_THREADS=4 OMP_PLACES=cores OMP_PROC_BIND=close
 SUM="$RUN/summary.txt"
-echo "job $JOB start $(date -Is) deadline $(date -d @$DEADLINE -Is)" >> "$SUM"
+echo "job $JOB stage $STAGE start $(date -Is) deadline $(date -d @$DEADLINE -Is)" >> "$SUM"
+if [ "$STAGE" = L ] && { [ ! -f "$RUN/phase0/PASS" ] || [ ! -f "$RUN/EC.json" ]; }; then
+  echo "STOP: stage L needs phase 0 PASS and EC.json (run stage P first)" >> "$SUM"; exit 0
+fi
 
 P0="$RUN/phase0"
-# phase 0 runs once: the allocation that takes the lock runs it; another one waits for its verdict (a lock of a job that
+# phase 0 (stage P allocations only; a stage-L job has exited above without PASS) runs once: the allocation that takes the lock runs it; another one waits for its verdict (a lock of a job that
 # no longer exists is taken over)
 while [ ! -f "$P0/PASS" ] && [ ! -f "$P0/FAIL" ]; do
   if mkdir "$RUN/phase0.lock" 2>/dev/null; then echo "$JOB" > "$RUN/phase0.lock/job"; break; fi
@@ -75,7 +83,11 @@ PYCHK
   if [ $? -eq 0 ]; then touch "$P0/PASS"; else touch "$P0/FAIL"; echo "STOP: phase 0 failed" >> "$SUM"; exit 0; fi
 fi
 
-python -m xcsb.campaign --study m1_ladder --run "$RUN" --deadline "$DEADLINE" --slots 4 >> "$RUN/campaign_$JOB.out" 2>&1
-echo "campaign rc=$? $(date -Is)" >> "$SUM"
+python -m xcsb.campaign --study m1_ladder --run "$RUN" --deadline "$DEADLINE" --slots 4 --stages "$STAGE" \
+    >> "$RUN/campaign_$JOB.out" 2>&1
+echo "campaign stage $STAGE rc=$? $(date -Is)" >> "$SUM"
+if [ "$STAGE" = P ]; then
+  python -m xcsb.cli m1 report-p --run "$RUN" > "$RUN/stage_p_report.md" 2>> "$SUM"
+fi
 python -m xcsb.cli m1 table --run "$RUN" > "$RUN/ladder_table.md" 2>> "$SUM"
 echo "job $JOB done $(date -Is)" >> "$SUM"

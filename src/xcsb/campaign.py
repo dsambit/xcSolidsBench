@@ -1,6 +1,6 @@
 """Campaign runner inside one allocation: runs the tasks of a study as srun steps in slots of a quarter node.
 
-    python -m xcsb.campaign --study m1_ladder --run RUN --deadline EPOCH [--slots 4]
+    python -m xcsb.campaign --study m1_ladder --run RUN --deadline EPOCH --stages P [--slots 4]
 
 A study module provides tasks(run) (ordered dicts with id, width in quarter nodes, est_s), done(run, task),
 failed(run, task) and command(run, task) (the xcsb CLI arguments). Scheduling: the first pending task (in study order) whose
@@ -36,8 +36,9 @@ def alive_jobs():
 
 
 class Runner:
-    def __init__(self, study, run, deadline, slots=4, jobid=None, launch=None, alive=alive_jobs, poll=POLL_S):
+    def __init__(self, study, run, deadline, slots=4, jobid=None, launch=None, alive=alive_jobs, poll=POLL_S, stages=None):
         self.study, self.run, self.deadline, self.slots = study, run, float(deadline), int(slots)
+        self.stages = None if stages is None else set(stages)
         self.jobid = str(jobid or os.environ.get("SLURM_JOB_ID", "nojob"))
         self.launch = launch or self._srun
         self.alive, self.poll = alive, poll
@@ -86,11 +87,17 @@ class Runner:
                + ["-n", str(RANKS_PER_SLOT * task["width"]), sys.executable, "-m", "xcsb.cli"] + self.study.command(self.run, task))
         return subprocess.Popen(cmd, stdout=open(log, "w"), stderr=subprocess.STDOUT)
 
+    def tasks(self):
+        """The study's tasks, restricted to the selected stages (a task without a 'stage' key belongs to every stage)."""
+        ts = self.study.tasks(self.run)
+        return ts if self.stages is None else [t for t in ts if t.get("stage") in self.stages]
+
     def loop(self):
-        tasks = self.study.tasks(self.run)
+        tasks = self.tasks()
         self.clean_stale(tasks)
         running, free = {}, self.slots
-        self.event(kind="start", deadline=self.deadline, slots=self.slots, n_tasks=len(tasks))
+        self.event(kind="start", deadline=self.deadline, slots=self.slots, n_tasks=len(tasks),
+                   stages=None if self.stages is None else sorted(self.stages))
         while True:
             for tid, (p, task, t0) in list(running.items()):
                 rc = p.poll()
@@ -106,7 +113,7 @@ class Runner:
                     shutil.rmtree(self._claim_dir(task))       # ended at the deadline without a result: free for later
                 self.event(kind="end", task=tid, rc=rc, ok=ok, failed=bad, seconds=time.time() - t0)
             remaining = self.deadline - time.time()
-            tasks = self.study.tasks(self.run)                 # a study may add tasks once earlier ones are done (stages)
+            tasks = self.tasks()                               # a study may add tasks once earlier ones are done (stages)
             pending = [t for t in tasks if not self.study.done(self.run, t) and not self.study.failed(self.run, t)
                        and not self.claimed(t)]
             started = False
@@ -135,9 +142,10 @@ def main(argv=None):
     p.add_argument("--run", required=True)
     p.add_argument("--deadline", type=float, required=True, help="epoch seconds at which every step is stopped")
     p.add_argument("--slots", type=int, default=4)
+    p.add_argument("--stages", required=True, help="comma-separated stage names to run (e.g. P, or L); others never start")
     a = p.parse_args(argv)
     study = importlib.import_module(f"xcsb.studies.{a.study}")
-    Runner(study, a.run, a.deadline, a.slots).loop()
+    Runner(study, a.run, a.deadline, a.slots, stages=a.stages.split(",")).loop()
     return 0
 
 

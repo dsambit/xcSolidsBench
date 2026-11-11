@@ -406,9 +406,12 @@ stated with every table. The files go to `$W/pseudo/sg15-1.2/` with sha256 in `p
 
 **Step 1 as staged (2026-11-11; `xcsb.studies.m1_ladder`, `scripts/perlmutter/job_m1_ladder.sh`, not yet run).**
 
-- Lattice: a = 2.861 Å (Fe), 3.028 Å (V), the measured low-temperature values WITH zero-point vibrations (archive entry
-  `solids/lattice_constants_exp_2026-11-11`, from Zhang et al. NJP 2018, Supplementary Material Table II, which cites Haas, Tran,
-  Blaha PRB 79, 085104 (2009) (not read); its PBE zero-point shifts 0.003 / 0.005 Å are recorded there, not applied; Q10).
+- Lattice (Q10 decided, user 2026-11-11: static lattice, zero-point corrected, for every solids calculation): a_static =
+  a_measured − Δ_ZP = 2.858 Å (Fe), 3.023 Å (V); archive entry `solids/lattice_constants_static_2026-11-11`. a_measured = 2.861,
+  3.028 Å (entry `solids/lattice_constants_exp_2026-11-11`: Zhang et al. NJP 2018, Supplementary Material Table II, 'Exp.' = with
+  zero-point; the measured values there cite Haas, Tran, Blaha PRB 79, 085104 (2009), not read). Δ_ZP = a_PBE(Corr.) −
+  a_PBE(Uncorr.) = 0.003 / 0.005 Å, the same table: per its caption 'Corr.' includes the zero-point energy (phonons at a set of
+  volumes) and 'Uncorr.' does not, so Δ_ZP > 0 is the zero-point expansion and the static lattice is smaller.
 - Cases `M1-<El>-<state>-<ecutwfc>-d<dual>`: state FM (starting_magnetization 0.5), NM (0.0, explicit), NM1 (nspin 1, the
   E(FM) − E(NM) reference of Fe in the PBE scan); 20³ Γ-centred k (256 irreducible points), Gaussian 0.01 Ry, conv_thr 1e−8.
 - E_c^PBE per element: PBE on ecutwfc ∈ {40, 50, ..., 120, 140} Ry (Fe FM, Fe NM1, V NM, V FM); E_c^PBE = the smallest scan
@@ -417,23 +420,35 @@ stated with every table. The files go to `$W/pseudo/sg15-1.2/` with sha256 in `p
 - Ladder: r ∈ {0.6, 0.8, 1, 1.25, 1.5, 2, 2.5, 3} × E_c^PBE at d = 4 and r ∈ {1, 2, 3} at d = 8, PBE, r2SCAN, SCH-SI-A:v3.1,
   SCH-SI-B:v3.1, states Fe FM, V NM, V FM; every SCF from the standard cold start (carrier TPSS, Sec. 5).
 - (b) on every converged density: λ = 0.35 (theta.lam of both v3.1 records, read from the pinned, sha256-checked records).
-- (c) at r = 3, d = 4, Fe FM and V NM, all four functionals: star = the largest full shell of reciprocal-lattice vectors with
-  |G| ≤ 0.8 √ecutwfc (checked invariant under the cubic group; e.g. 144 vectors, k = 12.19 bohr⁻¹ at 240 Ry for Fe);
-  h = Σ_star cos(G·r), g = 1 + c h; curvature channel c = A/k², gradient channel c = A/k, the SAME A in both (user 2026-11-11),
-  A = ε k²/N_star, ε ∈ {10⁻³, 10⁻², 5·10⁻²}: max |g − 1| = ε (curvature) and ε k ≈ 0.012, 0.12, 0.61 (gradient). With one star
-  the two seeds have the same shape and differ by the factor k in amplitude. ρ_σ' = g²ρ_σ, τ_σ' = g²τ_σ + ½g∇g·∇ρ_σ + ½ρ_σ|∇g|²
+- (c) at r = 3, d = 4, Fe FM and V NM, all four functionals. Seed g = 1 + c h, h = Σ_star cos(G·r), every seed with the same
+  PEAK density modulation max |g − 1| = c N_star = ε ∈ {10⁻³, 10⁻², 5·10⁻²} (user 2026-11-11). At one star the curvature form
+  c = A₂/k² and the gradient form c = A₁/k then give the SAME g, so a second seed at the same star would be redundant. What
+  separates the channels is the wavenumber: by Lemma 1 the common-factor seed changes ∇ρ_σ by O(εk) and ∇²ρ_σ by O(εk²), so the
+  second-order energy of a seed of peak ε is ε²(a_c k⁴ + a_g k² + O(k⁰)) (the k³ cross term averages out: ∇h and ∇²h are in
+  quadrature), a_c from the curvature channel and a_g from the gradient channel (the von Weizsäcker term included). The second
+  seed is therefore the same construction at a SMALLER wavenumber band: two bands, star = the largest full shell with |G| ≤
+  κ√ecutwfc, κ = 0.8 ('high') and 0.4 ('low'); e.g. Fe at 240 Ry: k = 12.20 bohr⁻¹ (144 vectors) and 5.93 bohr⁻¹ (72).
+  The ladder then sees ripples at two scales; the low band weights the gradient channel four times more relative to the
+  curvature channel, and the two bands at equal ε separate a_c and a_g. Shells are checked invariant under the cubic group.
+  ρ_σ' = g²ρ_σ, τ_σ' = g²τ_σ + ½g∇g·∇ρ_σ + ½ρ_σ|∇g|²
   (exact for a common orbital factor; then τ_σ' − τ_W,σ' = g²(τ_σ − τ_W,σ)), both × N_σ/N_σ' (electron count per spin kept)
   and projected onto the ecutrho sphere. QE's ρ and τ are overwritten (`set_density`, `qepy_set_tau`, with a read-back check);
   QE copies ρ into the mixer's input at the next diagonalization, so the Broyden history pairs the seeded input with its own
   output; orbitals: QE's converged ones in memory. Seeds run in order (ε ascending), each from the converged base fields.
   Reported per seed: E before/after, ΔE_xc of the seeded fields, moments, iterations and history, and for ρ_σ, ∇²ρ_σ, |∇ρ_σ|
   the star-mean Fourier amplitudes (base, seeded, final) and ratio = Re⟨δ_final, δ_seed⟩/⟨δ_seed, δ_seed⟩ (δ = change
-  against the base at the star; 0 decayed, 1 persisted). The rung's own SCF carries the curvature seeds; a second SCF of the
-  same case (run-directory tag `ripgrad`) the gradient seeds (each step: base SCF + 3 seeds, so that it fits 4 h).
+  against the base at the star; 0 decayed, 1 persisted). The rung's own SCF carries the high-band seeds; a second SCF of the
+  same case (run-directory tag `riplow`) the low-band seeds (each step: base SCF + 3 seeds, so that it fits 4 h).
 - Parallel layout: QE k-point pools (`-nk`, set through QEpy's `qepy_sys.set_command_line`), one rank per pool, 4 OpenMP
   threads; a quarter node (8 ranks) per SCF, a full node (32 ranks) for the r = 3 rungs. Pools are new in M1: phase 0 of the
   first allocation checks npool 8 against npool 1 (PBE and SCH-SI-B, Fe 40 Ry 8³ k; |ΔE| ≤ 10⁻⁶ Ry, |Δm| ≤ 10⁻⁴ μB) and that
-  the seeded restart runs (PBE, all six seeds); a failure stops the job.
+  the seeded restart runs (PBE, all six seeds, both bands); a failure stops the job.
+- Stages (user 2026-11-11): the job and the launcher take a stage selector, `P` or `L`, and the runner never starts a task of
+  the other stage. The FIRST allocation runs `P` only: phase 0, the PBE scan (→ `EC.json`) and a full-node probe (the 80 Ry
+  Fe FM scan case again on 32 ranks, tag `w4`: the measured full-node speedup); then it stops and writes
+  `stage_p_report.{json,md}`: EC.json, the measured per-SCF times with pools, the cost model refitted from them (QE s per
+  iteration, PBE iteration counts, full-node speedup, the SCH-SI hook time from phase 0) and the revised node-hours of stage L
+  with the seeds. The user then decides batch or interactive for stage L (which needs phase 0 PASS and EC.json).
 - Campaign runner (`xcsb.campaign`): tasks in order (stage P; then, once E_c is known, the d = 4 rungs ascending, the r = 3
   rungs with the seeds, the d = 8 points), as srun steps in quarter-node slots; a task starts only if 1.25 × its estimate fits
   the remaining allocation time; every step ends at the deadline; claims (mkdir) let two allocations share one run directory;
@@ -566,6 +581,11 @@ JSON/CSV with provenance (source, table/page, retrieval date, checked by whom), 
 Reference-functional results (PBE, r2SCAN; SCAN, TPSS if wanted, Q9) are computed once per protocol, banked there and never
 recomputed; only the models under test rerun. Creating the `archive` branch needs the user's permission (Q2).
 
+**Lattice constants (Q10, user 2026-11-11).** Every solids calculation at a fixed experimental lattice (M1, F2-F4) and every
+comparison of computed equilibrium lattice constants with experiment (F1 LC20, F5 Sol62) uses STATIC-lattice values:
+a_static = a_measured − Δ_ZP, with the zero-point expansion Δ_ZP of the source (a written-once archive entry per set, the
+measured values and Δ_ZP recorded beside the result; first entry `solids/lattice_constants_static_2026-11-11`, Fe and V).
+
 **Only the Zhang et al. main text (F5) has been read.** Every other citation below is a candidate from memory, to be confirmed when
 fetched and read; no value is banked from a source before it has been read and checked. The LC20 source paper is not in the
 archive yet (to fetch).
@@ -648,7 +668,7 @@ convergence = conv_elec, one SCF per process (QE keeps functional state between 
 - Q7. Batch permission for F1 (and F4), once the M1 timings are known.
 - Q8. PBE-D4 for solids: report raw and + D4 for lattice constants and bulk moduli (the v3.1 handoff asks the collaborator for both)?
 - Q9. Should SCAN and TPSS join PBE and r2SCAN as banked reference functionals?
-- Q10 (M1 staged with the measured values, zero-point included; the PBE zero-point shifts are in the archive entry). Fixed lattices (M1, F2-F4 moments): low-temperature experimental values with or without zero-point correction? Proposed:
+- Q10 DECIDED (user 2026-11-11): static-lattice, zero-point-corrected experimental values (a_measured − Δ_ZP) for every solids calculation (M1 ladder, and the same rule later for LC20 and Sol62; Sec. 8). Was: Fixed lattices (M1, F2-F4 moments): low-temperature experimental values with or without zero-point correction? Proposed:
   zero-point-corrected where the source provides it, the uncorrected value reported alongside.
 - Q11. "Sol62": Zhang et al. (NJP 2018) has 64 solids. Which 62 do you mean (which two are dropped, and why)?
 - Q12. F4: is QE's sphere-integrated site moment (fixed radius per element) acceptable, or do you prefer a Löwdin projection?
@@ -657,7 +677,7 @@ convergence = conv_elec, one SCF per process (QE keeps functional state between 
 - Q14. Ladder plateau criterion: plateau = the last two rungs within the F2/F3 criteria (moment 0.005 μB, 1 meV/atom) and
   successive differences shrinking as for PBE; drift = anything else, or a lower rippled state in (c). Acceptable, or a different
   threshold?
-- Q15 (staged 2026-11-11 as proposed, density level; plus the gradient-channel seed with the same A: see Sec. 6.2). Ripple-seeded restart: amplitudes A (proposed: ripple factors with max |g − 1| = 10⁻³, 10⁻², 5·10⁻²) and wavenumber (the
+- Q15 (staged 2026-11-11, density level; equal peak modulation ε for every seed, two wavenumber bands 0.8 and 0.4 √ecutwfc instead of a separate gradient-form seed: Sec. 6.2). Ripple-seeded restart: amplitudes A (proposed: ripple factors with max |g − 1| = 10⁻³, 10⁻², 5·10⁻²) and wavenumber (the
   largest symmetric star with |k| ≤ 0.8 √ecutwfc, in bohr⁻¹ with ecutwfc in Ry); seed at the density level (proposed, needs only `qepy_set_tau`) or at the
   orbital level (needs write access to QE's wavefunctions)?
 - Q16. If the ladder drifts: per-element cutoff definition of the model, or the nonlocal ∇²ln ρ smoothing first (your decision

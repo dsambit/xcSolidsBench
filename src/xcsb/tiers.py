@@ -132,8 +132,8 @@ def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None =
             seeds = None
             if ripple:
                 from .studies.m1_ladder import SeedPlan
-                from .studies.m1_ladder import ripple_channels
-                seeds = SeedPlan(case.ecutwfc, channels=ripple_channels(ripple))
+                from .studies.m1_ladder import ripple_bands
+                seeds = SeedPlan(case.ecutwfc, bands=ripple_bands(ripple))
 
             def run_posts(g, r, t):
                 out = {}

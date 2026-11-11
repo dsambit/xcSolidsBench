@@ -31,7 +31,8 @@ def test_case_names():
     assert c.nspin == 2 and c.starting_magnetization == {"V": 0.0} and c.kmesh == (20, 20, 20) and c.degauss == 0.01
     assert L.get_case("M1-Fe-NM1-60-d4").nspin == 1
     a = np.linalg.norm(L.get_case("M1-Fe-FM-60-d4").structure.lattice[0]) * 2 / np.sqrt(3) / L.BOHR_PER_ANGSTROM
-    assert abs(a - 2.861) < 1e-12
+    assert abs(a - 2.858) < 1e-12                                       # static lattice (user 2026-11-11, Q10)
+    assert L.A_EXP_ANGSTROM == {"Fe": 2.858, "V": 3.023}
 
 
 @needs_pseudos
@@ -78,33 +79,43 @@ def _rho_tau(grid, phis):
     return rho, tau
 
 
-def test_star_symmetric_and_bounded():
-    grid, e = _tiny()
-    miller, gv, k = L.star(grid, e)
-    assert k <= L.KFRAC * np.sqrt(e) + 1e-12 and len(gv) % 2 == 0
+@pytest.mark.parametrize("band", list(L.BANDS))
+def test_star_symmetric_and_bounded(band):
+    grid, e = _tiny(20.0)
+    miller, gv, k = L.star(grid, e, L.BANDS[band])
+    assert k <= L.BANDS[band] * np.sqrt(e) + 1e-12 and len(gv) % 2 == 0
     assert {tuple(x) for x in miller} == {tuple(-x) for x in miller}
     assert np.allclose(np.linalg.norm(gv, axis=1), k)
 
 
-@pytest.mark.parametrize("channel", L.CHANNELS)
-def test_seed_common_factor_exact(channel):
+def test_two_bands_distinct_production():
+    """At a production top rung (Fe, 240 Ry) the two bands are different shells, k_low about half of k_high."""
+    e = 240.0
+    s = L.get_case(L.case_name("Fe", "FM", e)).structure
+    n = round(L.fft_points("Fe", e, 4) ** (1 / 3))
+    grid = SpectralGrid(s.lattice, (n, n, n), 4 * e)
+    kh, kl = L.star(grid, e, L.BANDS["high"])[2], L.star(grid, e, L.BANDS["low"])[2]
+    assert kh <= 0.8 * np.sqrt(e) and kl <= 0.4 * np.sqrt(e) and 0.4 < kl / kh < 0.55
+
+
+@pytest.mark.parametrize("band", list(L.BANDS))
+def test_seed_common_factor_exact(band):
     """rho', tau' of the density-level seed equal those of the explicit orbitals g phi_i; tau' - tau_W' = g^2 (tau - tau_W)."""
-    s = L.get_case("M1-Fe-FM-6-d4").structure
-    grid = SpectralGrid(s.lattice, (32, 32, 32), 90.0)        # orbitals |G|^2 <= 6, the star |G| <= 0.8 sqrt(6): products exact
+    s = L.get_case("M1-Fe-FM-20-d4").structure
+    grid = SpectralGrid(s.lattice, (40, 40, 40), 160.0)       # orbitals |G|^2 <= 6, stars |G| <= 0.8 sqrt(20): products exact
     phis = _orbitals(grid, 6.0)
     rho, tau = _rho_tau(grid, phis)
-    plan = L.SeedPlan(6.0)
-    spec = {"label": f"{channel}-0.05", "channel": channel, "eps": 0.05}
-    _, c = plan.coefficient(grid, spec)
-    _, gv, k, h, gh = plan._star(grid)
+    plan = L.SeedPlan(20.0)
+    spec = {"label": f"{band}-0.05", "band": band, "eps": 0.05}
+    c = plan.coefficient(grid, spec)
+    _, gv, k, h, gh = plan._star(grid, band)
     r1, t1 = L.common_factor(grid, rho, tau, c, h, gh)
     g = 1.0 + c * h
     r2, t2 = _rho_tau(grid, [[g * p for p in ps] for ps in phis])
     assert np.max(np.abs(r1 - r2)) <= 1e-12 * np.max(rho) and np.max(np.abs(t1 - t2)) <= 1e-11 * np.max(tau)
     tw = lambda r: np.sum(grid.derivatives(r, laplacian=False, hessian=False)[0] ** 2, axis=1) / (8 * r)
     assert np.max(np.abs((t1 - tw(r1)) - g ** 2 * (tau - tw(rho)))) <= 1e-10 * np.max(tau)
-    a, c2 = plan.coefficient(grid, spec)
-    assert np.isclose(c2 * len(gv), 0.05 * (k if channel == "gradient" else 1.0))
+    assert np.isclose(np.max(np.abs(g - 1)), 0.05, rtol=1e-12)              # the peak modulation eps, in both bands
     # the seeded fields: the electron count of each spin kept, inside the ecutrho sphere, positive
     rs, ts = plan.apply(grid, rho, tau, spec)
     for sp in range(2):
@@ -113,20 +124,21 @@ def test_seed_common_factor_exact(channel):
 
 
 def test_amplitudes_ratio():
-    s = L.get_case("M1-Fe-FM-6-d4").structure
-    grid = SpectralGrid(s.lattice, (32, 32, 32), 90.0)
+    s = L.get_case("M1-Fe-FM-20-d4").structure
+    grid = SpectralGrid(s.lattice, (40, 40, 40), 160.0)
     rho, tau = _rho_tau(grid, _orbitals(grid, 6.0))
-    plan = L.SeedPlan(6.0)
+    plan = L.SeedPlan(20.0)
     for spec in plan.specs():
         r1, t1 = plan.apply(grid, rho, tau, spec)
-        back = plan.amplitudes(grid, (rho, tau), (r1, t1), (rho, tau))
-        kept = plan.amplitudes(grid, (rho, tau), (r1, t1), (r1, t1))
+        back = plan.amplitudes(grid, (rho, tau), (r1, t1), (rho, tau), spec["band"])
+        kept = plan.amplitudes(grid, (rho, tau), (r1, t1), (r1, t1), spec["band"])
         for key in ("rho", "lapl_rho", "abs_grad_rho"):
             for sp in range(2):
                 assert abs(back[key][sp]["ratio"]) < 1e-12 and abs(kept[key][sp]["ratio"] - 1) < 1e-12
                 assert kept[key][sp]["d_seed_rms"] > 0
     d = plan.describe(grid)
-    assert d["n_star"] > 0 and len(d["seeds"]) == len(L.EPS) * len(L.CHANNELS)
+    assert all(b["n_star"] > 0 for b in d["bands"].values()) and len(d["seeds"]) == len(L.EPS) * len(L.BANDS)
+    assert d["bands"]["low"]["k_bohr_inv"] < d["bands"]["high"]["k_bohr_inv"]
 
 
 # ---- (b) concave fraction --------------------------------------------------------------------------------------------------------
@@ -168,15 +180,31 @@ def test_ec_and_tasks(tmp_path):
     ts = L.tasks(run)
     tl = [t for t in ts if t["stage"] == "L"]
     assert len(tl) == len(L.RUNGS) * 3 * 4 + len(L.RUNGS_D8) * 3 * 4 + 8
+    assert len([t for t in ts if t["stage"] == "P"]) == len(L.SCAN_ECUT) * 4 + 1
     rip = [t for t in tl if t["ripple"]]
-    assert len(rip) == 16 and sum(t["tag"] == "ripgrad" for t in rip) == 8 and all(t["case"] in ("M1-Fe-FM-180-d4", "M1-V-NM-120-d4") for t in rip)
+    assert len(rip) == 16 and sum(t["tag"] == "riplow" for t in rip) == 8 and all(t["case"] in ("M1-Fe-FM-180-d4", "M1-V-NM-120-d4") for t in rip)
     assert all(t["width"] == 4 for t in tl if t["rung"] == 3.0) and all(t["width"] == 1 for t in tl if t["rung"] < 3.0)
     assert os.path.exists(os.path.join(run, "EC.json")) and all(t["est_s"] > 0 for t in ts)
-    assert L.command(run, rip[0])[-2:] == ["--ripple", "curvature"] and L.command(run, rip[1])[-4:] == [
-        "--ripple", "gradient", "--tag", "ripgrad"] and "--npool" in L.command(run, rip[0])
+    assert L.command(run, rip[0])[-2:] == ["--ripple", "high"] and L.command(run, rip[1])[-4:] == [
+        "--ripple", "low", "--tag", "riplow"] and "--npool" in L.command(run, rip[0])
+    w4 = [t for t in ts if t["stage"] == "P" and t["tag"] == "w4"]
+    assert len(w4) == 1 and w4[0]["width"] == 4 and L.command(run, w4[0])[-2:] == ["--tag", "w4"]
+    # the stage-P report: measured constants from the records, the stage-L estimate at the E_c found
+    from xcsb.tiers import run_dir as _rd
+    d = _rd(L.scf_root(run), w4[0]["case"], "hooked", "PBE") + "__w4"
+    os.makedirs(d, exist_ok=True)
+    json.dump({"status": "ok", "energies_ry": {"etot": -236.0}, "magnetization": {"total": 2.3, "absolute": 2.3},
+               "iterations": 10, "carrier": {"iterations": 12}, "seconds": 30.0, "history": [{"t_hook_s": 0.1}] * 10},
+              open(os.path.join(d, "record.json"), "w"))
+    rep = L.stage_p_report(run)
+    assert rep["ec"]["ec_pbe"] == ec and "full_node_speedup" in rep["cost"]["measured"]
+    assert rep["cost"]["full_node_speedup"] == pytest.approx((100 - 1.0) / (30 - 1.0))
+    assert rep["stage_l_estimate"]["node_h_total"] > 0
+    from xcsb.studies.m1_report import render_stage_p
+    assert "Stage L estimate" in render_stage_p(rep)
     # a ripple task is done only once every seed has ended
     t = rip[0]
-    plan = {"k_bohr_inv": 9.0, "n_star": 12, "seeds": []}
+    plan = {"bands": {"high": {"k_bohr_inv": 9.0, "n_star": 12}}, "seeds": []}
     sd = {"seed": {"label": "curvature-0.001"}, "status": "failed", "error": "test"}
     _fake_record(run, t["case"], t["functional"], -1.0, 0.0, ripple={"plan": plan, "seeds": [sd] * 2 + [{"seed": sd["seed"]}]})
     assert not L.done(run, t)
@@ -222,12 +250,17 @@ def test_runner(tmp_path):
         code = "import sys; sys.exit(3)" if t["id"] == "d" else f"open({st._p(run, t)!r}, 'w').write('ok')"
         return subprocess.Popen([sys.executable, "-c", code], stdout=open(log, "w"), stderr=subprocess.STDOUT)
 
-    r = campaign.Runner(st, run, time.time() + 60, slots=4, jobid="J1", launch=launch, alive=lambda: {"J1"}, poll=0.05)
+    for t in st.ts:
+        t["stage"] = "P"
+    st.ts.append(dict(id="f", width=1, est_s=1, stage="L"))              # another stage: never started
+    r = campaign.Runner(st, run, time.time() + 60, slots=4, jobid="J1", launch=launch, alive=lambda: {"J1"}, poll=0.05,
+                        stages=["P"])
     os.makedirs(os.path.join(run, "claims", "c"))                       # a stale claim of a dead job
     open(os.path.join(run, "claims", "c", "job"), "w").write("J0")
     r.loop()
     assert all(st.done(run, t) for t in st.ts if t["id"] in "abc")
     assert os.path.exists(os.path.join(run, "claims", "d", "failed")) and not os.path.exists(os.path.join(run, "claims", "e"))
+    assert not os.path.exists(os.path.join(run, "claims", "f")) and not st.done(run, st.ts[-1])
     ev = [json.loads(x) for x in open(os.path.join(run, "campaign_J1.jsonl"))]
     assert ev[-1]["kind"] == "exit" and ev[-1]["pending_fitting"] == 0
     assert any(e["kind"] == "stale_claim_removed" and e["task"] == "c" for e in ev)

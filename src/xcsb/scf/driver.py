@@ -212,7 +212,7 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
                                magnetization_before=base["magnetization"], magnetization_after=s.magnetization())
                     out["delta_etot_ry"] = out["etot_after_ry"] - out["etot_before_ry"]
                     if rank == 0:
-                        out["amplitudes"] = seeds.amplitudes(s.grid, (rho, tau), (r1, t1), (r2, t2))
+                        out["amplitudes"] = seeds.amplitudes(s.grid, (rho, tau), (r1, t1), (r2, t2), spec["band"])
                 except Exception as exc:                 # one seed's failure is recorded; the next seed starts from the base
                     out.update(status="failed", error=f"{type(exc).__name__}: {exc}", traceback=traceback.format_exc())
                 out["seconds"] = time.time() - ts

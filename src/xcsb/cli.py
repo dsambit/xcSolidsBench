@@ -43,11 +43,11 @@ def main(argv=None):
     s.add_argument("--mag-split", action="store_true", help="frozen split of E_xc and its magnetization dependence by piece")
     s.add_argument("--fsm-parts", action="store_true", help="E_x, E_c, pieces, switch means and the frozen pairing test")
     s.add_argument("--npool", type=int, default=1, help="QE k-point pools (-nk); must divide the rank count")
-    s.add_argument("--ripple", choices=["all", "curvature", "gradient"],
-                   help="M1: ripple-seeded restarts after convergence, both channels or one (studies.m1_ladder)")
+    s.add_argument("--ripple", choices=["all", "high", "low"],
+                   help="M1: ripple-seeded restarts after convergence, both wavenumber bands or one (studies.m1_ladder)")
     s.add_argument("--m1-diag", action="store_true", help="M1: BR-concave electron fraction of the converged density")
     m1 = sub.add_parser("m1", help="M1 cutoff ladder: task list, E_c^PBE, tables (serial; no QE)")
-    m1.add_argument("what", choices=["tasks", "ec", "table"])
+    m1.add_argument("what", choices=["tasks", "ec", "table", "report-p"])
     m1.add_argument("--run", required=True)
     pv = sub.add_parser("prep-variant", help="re-solve and cache the norms of norm-dependent xchole variants (serial)")
     pv.add_argument("names", nargs="+")
@@ -81,6 +81,11 @@ def main(argv=None):
         if a.what == "tasks":
             for t in L.tasks(a.run):
                 print(json.dumps(dict(t, done=L.done(a.run, t), failed=L.failed(a.run, t))))
+        elif a.what == "report-p":
+            res = L.stage_p_report(a.run)
+            json.dump(res, open(os.path.join(a.run, "stage_p_report.json"), "w"), indent=1, default=float)
+            from .studies.m1_report import render_stage_p
+            print(render_stage_p(res))
         elif a.what == "ec":
             print(json.dumps({"ec_pbe": L.e_c_pbe(a.run), "scan": L.scan_table(a.run)}, indent=1, default=float))
         else:

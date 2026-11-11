@@ -9,8 +9,8 @@ Stage P (PBE alone): ecutwfc in SCAN_ECUT for Fe FM, Fe NM1, V NM, V FM; E_c^PBE
 which every successive pair is within the F2/F3 criteria (moment 0.005 mu_B/atom, E(FM) - E(NM) 1 meV/atom).
 Stage L: PBE, r2SCAN, SCH-SI-A:v3.1, SCH-SI-B:v3.1 on ecutwfc = r E_c^PBE, r in RUNGS, d = 4, plus d = 8 at r in RUNGS_D8;
 states Fe FM, V NM, V FM. The top d = 4 rung of Fe FM and V NM carries the ripple-seeded restarts (SeedPlan): the rung's
-own record the curvature-channel seeds, a second SCF of the same case (run-directory tag 'ripgrad') the gradient-channel
-seeds, so that each step (base SCF + 3 seeds) fits one 4 h allocation.
+own record the seeds of the high band, a second SCF of the same case (run-directory tag 'riplow') those of the low band, so
+that each step (base SCF + 3 seeds) fits one 4 h allocation.
 
 Diagnostics on every converged density (post): (b) the BR-concave electron fraction, sum_s int rho_s [z_s < Z_STAR] / N with
 z_s = 3 Q_s / (2 pi^(2/3) rho_s^(5/3)), Q_s = [lap rho_s - 4 lam (tau_s - tau_W,s)] / 6 (Hartree tau), lam from the pinned
@@ -20,12 +20,16 @@ Ripple seeds (c), at the density level (Lemma 1 of the ripple note: a common orb
     rho_s' = g^2 rho_s,   tau_s' = g^2 tau_s + (1/2) g grad g . grad rho_s + (1/2) rho_s |grad g|^2,
 exact for a common factor (then tau_s' - tau_W,s' = g^2 (tau_s - tau_W,s)), both multiplied by N_s / N_s' (a constant factor
 of the orbitals of spin s: the electron count of each spin is kept) and projected onto the ecutrho sphere (P);
-    h(r) = sum_{G in star} cos(G . r),  g = 1 + c h,  curvature channel c = A / k^2,  gradient channel c = A / k,
-the star = the largest shell of reciprocal-lattice vectors with |G| <= KFRAC sqrt(ecutwfc) (bohr^-1, ecutwfc in Ry; a full
-shell is invariant under the point group, so QE's symmetrization keeps the seed), k = |G| of that shell. The amplitudes A are
-the same for both channels (user 2026-11-11): A = eps k^2 / N_star with eps in EPS, i.e. max |g - 1| = eps in the curvature
-channel and eps k (k in bohr^-1) in the gradient channel. With one star the two seeds have the same shape; they differ by the
-factor k in amplitude.
+    h(r) = sum_{G in star} cos(G . r),  g = 1 + c h,
+the star = the largest full shell of reciprocal-lattice vectors with |G| <= kfrac sqrt(ecutwfc) (bohr^-1, ecutwfc in Ry; a
+full shell is invariant under the point group, so QE's symmetrization keeps the seed), k = |G| of that shell, for two bands
+kfrac in BANDS (high 0.8, low 0.4). Every seed has the peak modulation max |g - 1| = c N_star = eps, eps in EPS (user
+2026-11-11), i.e. c = eps / N_star. (At one star the 'curvature' form c = A2/k^2 and the 'gradient' form c = A1/k give the
+same g at equal peak modulation; the channels are separated by the wavenumber instead: the seed changes grad rho_s by O(eps k)
+and lap rho_s by O(eps k^2), so the second-order energy of a seed of peak eps is eps^2 (a_c k^4 + a_g k^2 + O(k^0)) (the k^3 cross
+term averages out: grad h and lap h are in quadrature), a_g from the gradient channel (von Weizsaecker term included), a_c
+from the curvature channel; two wavenumbers at the same eps separate a_c and a_g, and the low band weights the gradient
+channel four times more relative to the curvature one.)
 """
 from __future__ import annotations
 
@@ -39,10 +43,12 @@ import numpy as np
 from ..bench.structures import BOHR_PER_ANGSTROM, bcc
 from ..host.qe import Case
 
-# experimental lattice constants (with zero-point; refdata archive entry solids/lattice_constants_exp_2026-11-11, from
-# Zhang, Reilly, Tkatchenko, Scheffler, New J. Phys. 20, 063020 (2018), Supplementary Material Table II, 'Exp.' column)
-A_EXP_ANGSTROM = {"Fe": 2.861, "V": 3.028}
-A_EXP_SOURCE = "refdata solids/lattice_constants_exp_2026-11-11 (Zhang et al. NJP 2018 SM Table II, Exp.; with zero-point)"
+# static-lattice (zero-point-corrected) experimental lattice constants, a_static = a_measured - Delta_ZP (user 2026-11-11, Q10:
+# every solids calculation): refdata archive entry solids/lattice_constants_static_2026-11-11, from the measured values
+# (solids/lattice_constants_exp_2026-11-11: Fe 2.861, V 3.028) and the PBE zero-point expansions Delta_ZP = a(Corr.) - a(Uncorr.)
+# (Fe 0.003, V 0.005) of Zhang, Reilly, Tkatchenko, Scheffler, New J. Phys. 20, 063020 (2018), Supplementary Material Table II
+A_EXP_ANGSTROM = {"Fe": 2.858, "V": 3.023}
+A_EXP_SOURCE = "refdata solids/lattice_constants_static_2026-11-11 (static lattice: measured - PBE zero-point expansion)"
 KMESH = (20, 20, 20)
 DEGAUSS = 0.01                   # Ry, Gaussian (settings.SMEARING)
 START_M = {"FM": 0.5, "NM": 0.0}
@@ -57,9 +63,8 @@ CRIT_MOMENT = 0.005              # mu_B / atom
 CRIT_DE_MEV = 1.0                # meV / atom
 RY_MEV = 13605.693122994         # meV per Ry (CODATA 2018)
 Z_STAR = -0.861
-KFRAC = 0.8
-EPS = (1e-3, 1e-2, 5e-2)
-CHANNELS = ("curvature", "gradient")
+BANDS = {"high": 0.8, "low": 0.4}     # kfrac of the seed star: |G| <= kfrac sqrt(ecutwfc)
+EPS = (1e-3, 1e-2, 5e-2)              # peak modulation max |g - 1|
 
 
 # ---- cases ------------------------------------------------------------------------------------------------------------------
@@ -148,7 +153,7 @@ def cubic_ops():
     return ops
 
 
-def star(grid, ecutwfc, kfrac=KFRAC):
+def star(grid, ecutwfc, kfrac):
     """The largest full shell of reciprocal-lattice vectors with 0 < |G| <= kfrac sqrt(ecutwfc): (Miller indices (N, 3), G (N, 3),
     k). Raises unless the shell is invariant under the cubic point group (M1 cells are cubic) and inside the ecutrho sphere."""
     kmax2 = kfrac ** 2 * ecutwfc
@@ -202,55 +207,52 @@ def seeded_fields(grid, rho, tau, c, h, gh):
 
 
 class SeedPlan:
-    """The ripple seeds of one SCF: the star for its ecutwfc, both channels, the amplitudes EPS."""
+    """The ripple seeds of one SCF: for each band its star at this ecutwfc, the peak modulations EPS."""
 
-    def __init__(self, ecutwfc, eps=EPS, channels=CHANNELS, kfrac=KFRAC):
-        self.ecutwfc, self.eps, self.channels, self.kfrac = float(ecutwfc), tuple(eps), tuple(channels), kfrac
-        self._cache = None
+    def __init__(self, ecutwfc, eps=EPS, bands=tuple(BANDS)):
+        self.ecutwfc, self.eps, self.bands = float(ecutwfc), tuple(eps), tuple(bands)
+        for b in self.bands:
+            if b not in BANDS:
+                raise ValueError(f"band {b!r}: one of {sorted(BANDS)}")
+        self._cache = {}
 
-    def _star(self, grid):
-        if self._cache is None:
-            miller, gv, k = star(grid, self.ecutwfc, self.kfrac)
+    def _star(self, grid, band):
+        if band not in self._cache:
+            miller, gv, k = star(grid, self.ecutwfc, BANDS[band])
             h, gh = ripple_h(grid, gv)
-            self._cache = (miller, gv, k, h, gh)
-        return self._cache
+            self._cache[band] = (miller, gv, k, h, gh)
+        return self._cache[band]
 
     def specs(self):
-        out = []
-        for ch in self.channels:
-            for e in self.eps:
-                out.append({"label": f"{ch}-{e:g}", "channel": ch, "eps": e})
-        return out
+        return [{"label": f"{b}-{e:g}", "band": b, "eps": e} for b in self.bands for e in self.eps]
 
     def coefficient(self, grid, spec):
-        miller, gv, k, _, _ = self._star(grid)
-        a = spec["eps"] * k ** 2 / len(gv)
-        return a, {"curvature": a / k ** 2, "gradient": a / k}[spec["channel"]]
+        """c of g = 1 + c h: max |g - 1| = c N_star = eps (h = N_star at r = 0)."""
+        return spec["eps"] / len(self._star(grid, spec["band"])[1])
 
     def describe(self, grid):
-        miller, gv, k, _, _ = self._star(grid)
-        rows = []
-        for sp in self.specs():
-            a, c = self.coefficient(grid, sp)
-            rows.append(dict(sp, A=a, c=c, max_abs_g_minus_1=c * len(gv)))
-        return {"k_bohr_inv": k, "kmax_bohr_inv": self.kfrac * np.sqrt(self.ecutwfc), "n_star": int(len(gv)),
-                "miller": miller.tolist(), "seeds": rows,
+        bands = {}
+        for b in self.bands:
+            miller, gv, k, _, _ = self._star(grid, b)
+            bands[b] = {"kfrac": BANDS[b], "k_bohr_inv": k, "kmax_bohr_inv": BANDS[b] * np.sqrt(self.ecutwfc),
+                        "n_star": int(len(gv)), "miller": miller.tolist()}
+        return {"bands": bands, "seeds": [dict(sp, c=self.coefficient(grid, sp)) for sp in self.specs()],
+                "g": "g = 1 + c sum_star cos(G.r), max |g - 1| = eps",
                 "tau_rule": "tau' = g^2 tau + g grad g . grad rho / 2 + rho |grad g|^2 / 2 (exact for a common orbital factor)",
                 "normalization": "rho', tau' times N_s / N_s' per spin, then projected onto the ecutrho sphere"}
 
     def apply(self, grid, rho, tau, spec):
-        _, _, _, h, gh = self._star(grid)
-        _, c = self.coefficient(grid, spec)
-        r1, t1 = seeded_fields(grid, rho, tau, c, h, gh)
+        _, _, _, h, gh = self._star(grid, spec["band"])
+        r1, t1 = seeded_fields(grid, rho, tau, self.coefficient(grid, spec), h, gh)
         if np.any(r1 <= 0):
             raise ValueError(f"seeded density not positive (min {r1.min():.3e})")
         return r1, t1
 
-    def amplitudes(self, grid, base, seeded, final):
+    def amplitudes(self, grid, base, seeded, final, band):
         """Star components of rho_s, lap rho_s and |grad rho_s| (Fourier coefficients, f = sum_G f_G e^{iG.r}): the
         star-mean |f_G| of the base, seeded and final fields, the rms seeded and final changes against the base, and
         ratio = Re <d_final, d_seed> / <d_seed, d_seed> (0: the seed decayed; 1: it persisted; > 1: it grew)."""
-        miller = self._star(grid)[0]
+        miller = self._star(grid, band)[0]
         idx = tuple((miller % np.array(grid.shape)).T)
 
         def comps(rho):
@@ -296,9 +298,14 @@ def summary(r):
 
 
 # ---- stage P: E_c^PBE ------------------------------------------------------------------------------------------------------------
+W4_PROBE = ("Fe", "FM", 80.0)          # stage P also runs this scan case on a full node (tag w4): the measured full-node speedup
+
+
 def stage_p_tasks():
-    return [{"id": f"P__{case_name(el, st, e)}", "case": case_name(el, st, e), "functional": "PBE", "width": 1, "stage": "P",
-             "ripple": None, "tag": ""} for e in SCAN_ECUT for el, st in SCAN_STATES]
+    t = [{"id": f"P__{case_name(el, st, e)}", "case": case_name(el, st, e), "functional": "PBE", "width": 1, "stage": "P",
+          "ripple": None, "tag": ""} for e in SCAN_ECUT for el, st in SCAN_STATES]
+    c = case_name(*W4_PROBE)
+    return t + [{"id": f"P__{c}__w4", "case": c, "functional": "PBE", "width": 4, "stage": "P", "ripple": None, "tag": "w4"}]
 
 
 def scan_table(run):
@@ -350,11 +357,11 @@ def stage_l_tasks(ec):
                     rip = d == 4 and r == RUNGS[-1] and (el, st) in RIPPLE_STATES
                     base = {"case": case_name(el, st, e, d), "functional": f, "width": 4 if r == RUNGS[-1] else 1,
                             "stage": "L", "rung": r}
-                    tasks.append(dict(base, id=f"L__{case_name(el, st, e, d)}__{f}", ripple="curvature" if rip else None,
+                    tasks.append(dict(base, id=f"L__{case_name(el, st, e, d)}__{f}", ripple="high" if rip else None,
                                       tag=""))
                     if rip:
-                        tasks.append(dict(base, id=f"L__{case_name(el, st, e, d)}__{f}__ripgrad", ripple="gradient",
-                                          tag="ripgrad"))
+                        tasks.append(dict(base, id=f"L__{case_name(el, st, e, d)}__{f}__riplow", ripple="low",
+                                          tag="riplow"))
     return tasks
 
 
@@ -394,27 +401,94 @@ def estimate_s(task, cost=COST):
     it_h = cost["it_sch"] if sch else cost["it_libxc"]
     t = cost["it_carrier"] * qe + it_h * (qe + hook)
     if task.get("ripple"):
-        t += len(EPS) * len(ripple_channels(task["ripple"])) * cost["it_seed"] * (qe + hook)
+        t += len(EPS) * len(ripple_bands(task["ripple"])) * cost["it_seed"] * (qe + hook)
     return float(t)
 
 
+def _qe_s_per_it(r):
+    return (r["seconds"] - sum(h["t_hook_s"] for h in r["history"])) / (r["carrier"]["iterations"] + r["iterations"])
+
+
+def phase0_record(run, functional, tag):
+    from ..tiers import run_dir
+    p = os.path.join(run_dir(os.path.join(run, "phase0"), PHASE0_CASE, "hooked", functional) + f"__{tag}", "record.json")
+    return json.load(open(p)) if os.path.exists(p) else None
+
+
+PHASE0_CASE = "M1-Fe-FM-40-d4-k8"
+
+
 def calibrated_cost(run):
-    """COST with qe_s_80 refitted from the stage-P records (QE time per iteration, carrier and hook phases together)."""
-    vals = []
+    """COST refitted from measured records, each constant only where its record exists ('measured' lists which):
+    qe_s_80 (QE s per iteration, quarter node, pools) and the PBE iteration counts from the stage-P scan; full_node_speedup
+    from the w4 probe; hook_sch_s (one round of chunks) from phase 0's SCH-SI-B npool-8 run. it_sch and it_seed stay assumed."""
+    cost, measured = dict(COST), []
+    vals, itc, ith = [], [], []
     for t in stage_p_tasks():
+        if t["tag"]:
+            continue
         r = record(run, t["case"], "PBE")
         if not _ok(r):
             continue
         el, st, ecut, _, _ = parse_case(t["case"])
-        n_it = r["carrier"]["iterations"] + r["iterations"]
-        qe_s = (r["seconds"] - sum(h["t_hook_s"] for h in r["history"])) / n_it
-        vals.append(qe_s / ((ecut / 80.0) ** 1.5 * (0.5 if st == "NM1" else 1.0)))
-    return dict(COST, qe_s_80=float(np.median(vals)), calibrated_from=len(vals)) if vals else dict(COST)
+        vals.append(_qe_s_per_it(r) / ((ecut / 80.0) ** 1.5 * (0.5 if st == "NM1" else 1.0)))
+        itc.append(r["carrier"]["iterations"])
+        ith.append(r["iterations"])
+    if vals:
+        cost.update(qe_s_80=float(np.median(vals)), it_carrier=float(np.median(itc)), it_libxc=float(np.median(ith)))
+        measured += ["qe_s_80", "it_carrier", "it_libxc"]
+    c = case_name(*W4_PROBE)
+    q, f = record(run, c, "PBE"), record(run, c, "PBE", "w4")
+    if _ok(q) and _ok(f):
+        cost["full_node_speedup"] = _qe_s_per_it(q) / _qe_s_per_it(f)
+        measured.append("full_node_speedup")
+    r = phase0_record(run, "SCH-SI-B:v3.1", "np8")
+    if _ok(r):
+        cost["hook_sch_s"] = float(np.median([h["t_hook_s"] for h in r["history"]]))
+        measured.append("hook_sch_s")
+    cost["measured"] = measured
+    return cost
+
+
+def stage_p_report(run):
+    """After stage P: EC.json, the measured per-SCF times (pools), the calibrated cost model and the node-hour estimate of
+    stage L (ladder + seeds) at the measured E_c^PBE."""
+    rows = []
+    for t in stage_p_tasks():
+        r = record(run, t["case"], "PBE", t["tag"])
+        row = {"task": t["id"], "status": None if r is None else r.get("status")}
+        if _ok(r):
+            hk = [h["t_hook_s"] for h in r["history"]]
+            row.update(seconds=r["seconds"], carrier_iterations=r["carrier"]["iterations"], hook_iterations=r["iterations"],
+                       qe_s_per_iteration=_qe_s_per_it(r), hook_s_per_iteration=float(np.mean(hk)),
+                       ranks=r.get("parallel", {}).get("ranks"), npool=r.get("parallel", {}).get("npool"))
+        rows.append(row)
+    p0 = {}
+    for f in ("PBE", "SCH-SI-B:v3.1"):
+        for tag in ("np1", "np8", "rip"):
+            r = phase0_record(run, f, tag)
+            if _ok(r):
+                p0[f"{f}|{tag}"] = {"seconds": r["seconds"], "etot_ry": r["energies_ry"]["etot"], "m": r["magnetization"]["total"],
+                                    "iterations": r["iterations"], "qe_s_per_iteration": _qe_s_per_it(r),
+                                    "hook_s_per_iteration": float(np.mean([h["t_hook_s"] for h in r["history"]]))}
+    pe = os.path.join(run, "EC.json")
+    ec = json.load(open(pe)) if os.path.exists(pe) else None
+    cost = calibrated_cost(run)
+    est = None
+    if ec:
+        tl = [dict(t, est_s=estimate_s(t, cost)) for t in stage_l_tasks(ec["ec_pbe"])]
+        nh = lambda ts: sum(t["est_s"] * t["width"] / 4 for t in ts) / 3600
+        est = {"node_h_total": nh(tl), "node_h_seed_tasks": nh([t for t in tl if t["ripple"]]),
+               "node_h_d8": nh([t for t in tl if t["case"].endswith("d8")]), "n_tasks": len(tl),
+               "longest_step_h": max(t["est_s"] for t in tl) / 3600,
+               "per_task_h": {t["id"]: t["est_s"] / 3600 for t in tl}}
+    return {"ec": ec, "scf_times": rows, "phase0": p0, "cost": cost, "stage_l_estimate": est}
 
 
 # ---- the task list the campaign runner consumes ---------------------------------------------------------------------------------------
 def tasks(run):
-    """Stage P, then (once every scan is complete) stage L; each task with its scheduling estimate. EC.json is written once."""
+    """Stage P, then (once every scan is complete) stage L; each task with its scheduling estimate. EC.json is written once.
+    (The job selects the stage: the campaign runner's --stages filter.)"""
     tp = stage_p_tasks()
     cost = calibrated_cost(run)
     out = [dict(t, est_s=estimate_s(t, cost)) for t in tp]
@@ -430,18 +504,18 @@ def tasks(run):
     return out + [dict(t, est_s=estimate_s(t, cost)) for t in stage_l_tasks(ec)]
 
 
-def ripple_channels(ripple):
-    """The --ripple value: 'all' or one channel."""
+def ripple_bands(ripple):
+    """The --ripple value: 'all' or one band."""
     if ripple == "all":
-        return CHANNELS
-    if ripple not in CHANNELS:
-        raise ValueError(f"ripple {ripple!r}: 'all' or one of {CHANNELS}")
+        return tuple(BANDS)
+    if ripple not in BANDS:
+        raise ValueError(f"ripple {ripple!r}: 'all' or one of {sorted(BANDS)}")
     return (ripple,)
 
 
 def ripple_complete(r, ripple):
     sd = (r.get("ripple") or {}).get("seeds", [])
-    return len(sd) == len(EPS) * len(ripple_channels(ripple)) and all("status" in x for x in sd)
+    return len(sd) == len(EPS) * len(ripple_bands(ripple)) and all("status" in x for x in sd)
 
 
 def done(run, task):
@@ -507,7 +581,7 @@ def table(run):
     for el, st in RIPPLE_STATES:
         e = round(RUNGS[-1] * ec[el], 6)
         for f in FUNCTIONALS:
-            recs = [x for x in (record(run, case_name(el, st, e), f), record(run, case_name(el, st, e), f, "ripgrad"))
+            recs = [x for x in (record(run, case_name(el, st, e), f), record(run, case_name(el, st, e), f, "riplow"))
                     if x is not None and "ripple" in x]
             if not recs:
                 continue
@@ -522,6 +596,7 @@ def table(run):
                 else:
                     row["error"] = sd.get("error")
                 rows.append(row)
-            out["ripple"][f"{el}-{st}|{f}"] = {"plan": {k: rec["ripple"]["plan"][k] for k in ("k_bohr_inv", "n_star")},
+            out["ripple"][f"{el}-{st}|{f}"] = {"bands": {b: {k: v[k] for k in ("k_bohr_inv", "n_star")}
+                                                         for r_ in recs for b, v in r_["ripple"]["plan"]["bands"].items()},
                                                "rows": rows}
     return out

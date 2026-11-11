@@ -59,3 +59,32 @@ def render(t) -> str:
             out.append(f"| {key} | {r['seed']} | ok | {r['iterations']} | {r['de_mev']:.4f} | {r['de_xc_seed_mev']:.3f} | "
                        f"{r['m_before']:.4f} | {r['m_after']:.4f} | {rt['rho']} | {rt['lapl_rho']} | {rt['abs_grad_rho']} |")
     return "\n".join(out)
+
+
+def render_stage_p(t) -> str:
+    """The stop report of the first allocation (phase 0 + stage P): EC.json, measured times, revised stage-L estimate."""
+    out = ["# M1 phase 0 + stage P report", ""]
+    out.append(f"E_c^PBE: {t['ec']['ec_pbe'] if t['ec'] else 'not determined (scan incomplete)'}")
+    out.append("\n## Phase 0 (Fe 40 Ry, 8^3 k, 8 ranks)")
+    out.append("| run | E (Ry) | m (muB) | hook it | QE s/it | hook s/it | s |")
+    out.append("|---|---|---|---|---|---|---|")
+    for k, r in t["phase0"].items():
+        out.append(f"| {k} | {r['etot_ry']:.8f} | {r['m']:.4f} | {r['iterations']} | {r['qe_s_per_iteration']:.2f} | "
+                   f"{r['hook_s_per_iteration']:.2f} | {r['seconds']:.0f} |")
+    out.append("\n## Stage P SCF times (PBE, 20^3 k, pools: one rank per pool)")
+    out.append("| task | status | ranks | npool | carrier it | hook it | QE s/it | hook s/it | s |")
+    out.append("|---|---|---|---|---|---|---|---|---|")
+    for r in t["scf_times"]:
+        if "seconds" not in r:
+            out.append(f"| {r['task']} | {r['status'] or 'missing'} | | | | | | | |")
+            continue
+        out.append(f"| {r['task']} | ok | {r['ranks']} | {r['npool']} | {r['carrier_iterations']} | {r['hook_iterations']} | "
+                   f"{r['qe_s_per_iteration']:.2f} | {r['hook_s_per_iteration']:.2f} | {r['seconds']:.0f} |")
+    c = t["cost"]
+    out.append("\n## Cost model (measured: " + (", ".join(c.get("measured", [])) or "none") + "; the rest assumed)")
+    out.append(", ".join(f"{k} = {v:.3g}" for k, v in c.items() if isinstance(v, (int, float))))
+    e = t["stage_l_estimate"]
+    if e:
+        out.append(f"\n## Stage L estimate: {e['node_h_total']:.1f} node-h for {e['n_tasks']} tasks "
+                   f"(seed tasks {e['node_h_seed_tasks']:.1f}, d = 8 {e['node_h_d8']:.1f}); longest step {e['longest_step_h']:.2f} h")
+    return "\n".join(out)
