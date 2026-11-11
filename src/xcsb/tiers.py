@@ -31,7 +31,7 @@ TOL_V3_EIG = 1e-5      # Ry
 TOL_V3_MAG = 1e-4      # mu_B / cell
 TOL_V3_EXC = 1e-6      # relative, host E_xc on the native density vs QE etxc (QE's meta threshold points removed)
 TOL_V4_E = 1e-8        # Ry
-FE_MIXING = 0.1        # verification Fe cells: Broyden beta (round 3: SCH-SI-B at beta 0.3 stalled at dr2 ~ 1e-9 > conv_thr)
+FE_MIXING = 0.3        # verification Fe cells: Broyden beta (the global default; 0.1 did not help from the old start)
 
 
 def case_si(**kw):

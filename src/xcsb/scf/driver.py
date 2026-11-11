@@ -99,17 +99,27 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
     t0 = time.time()
     rank = comm.Get_rank()
     f = get_functional(functional_name)
-    s = QESession(case, settings.CARRIER_DFT, workdir, comm, iterative=True)
+    # Start (the same for every functional): the converged ground state of the carrier meta-GGA (QE's own TPSS SCF from
+    # QE's cold start), read back as startingpot = startingwfc = 'file'. Its density is an SCF output, sum f |psi|^2 >= 0
+    # with tau >= tau_W (DESIGN 4.5); the atomic superposition is not positive (SG15 Fe: 0.85 e of negative charge) and
+    # the density of the bare starting orbitals is far from self-consistency (Fe: dr2 ~ 7e2 Ry), so the hook sees neither.
+    outdir = os.path.join(workdir, "out")
+    c = QESession(case, settings.CARRIER_DFT, os.path.join(workdir, "carrier"), comm, iterative=False, outdir=outdir)
+    c.driver.scf()
+    carrier = {"converged": bool(c.driver.qepy_modules.control_flags.get_conv_elec()), "energies_ry": c.energies(),
+               "magnetization": c.magnetization()}
+    c.driver.save("all")
+    c.stop()
+    if not carrier["converged"]:
+        raise SCFError(f"start: the carrier {settings.CARRIER_DFT} SCF did not converge")
+    s = QESession(case, settings.CARRIER_DFT, workdir, comm, iterative=True, outdir=outdir, restart=True)
     rec = {"mode": "hooked", "functional": functional_name, "functional_provenance": f.provenance,
-           "case": case.as_dict(), "provenance": code_provenance(), "history": [], "status": "running"}
+           "case": case.as_dict(), "provenance": code_provenance(), "history": [], "status": "running",
+           "start": f"converged {settings.CARRIER_DFT} (QE native) ground state, startingpot/startingwfc = 'file'",
+           "carrier": carrier}
     record_path = record_path or os.path.join(workdir, "record.json")
     e_prev = None
     try:
-        # Start: the density of the starting orbitals (QE wfcinit, the same for every functional): sum_band on them gives
-        # rho = sum f |psi|^2 >= 0 and tau >= tau_W exactly (DESIGN 4.5). The atomic superposition itself is not positive
-        # (SG15 Fe: 0.85 e of negative charge), so the hook never sees it. No diagonalization, no mixing step is spent.
-        s.driver.qepy_pw.qepy_mod.qepy_calc_density()
-        rec["start"] = "density of the starting orbitals (qepy_calc_density: sum_band on the wfcinit orbitals)"
         for it in range(1, maxiter + 1):
             ti = time.time()
             rho, tau = s.spin_densities()

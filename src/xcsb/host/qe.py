@@ -55,7 +55,8 @@ class Case:
                 "mixing_beta": self.mixing_beta, "nbnd": self.nbnd}
 
 
-def pw_input(case: Case, input_dft: str, pseudo_dir: str, outdir: str, prefix: str, maxiter: int = settings.MAXITER) -> str:
+def pw_input(case: Case, input_dft: str, pseudo_dir: str, outdir: str, prefix: str, maxiter: int = settings.MAXITER,
+             restart: bool = False) -> str:
     """The pw.x input text. No forces, no stress (not provided by the host)."""
     s = case.structure
     for el in sorted(set(s.elements.values())):
@@ -81,7 +82,9 @@ def pw_input(case: Case, input_dft: str, pseudo_dir: str, outdir: str, prefix: s
              "&SYSTEM", *sysl, "/",
              "&ELECTRONS", f"  conv_thr = {case.conv_thr:.3e}", f"  mixing_mode = '{settings.MIXING_MODE}'",
              f"  mixing_beta = {case.mixing_beta:.6f}", f"  mixing_ndim = {settings.MIXING_NDIM}",
-             f"  electron_maxstep = {maxiter}", f"  startingwfc = '{settings.STARTINGWFC}'", "/",
+             f"  electron_maxstep = {maxiter}",
+             f"  startingwfc = '{'file' if restart else settings.STARTINGWFC}'",
+             f"  startingpot = '{'file' if restart else 'atomic'}'", "/",
              "ATOMIC_SPECIES"]
     for lab in s.species:
         lines.append(f"  {lab} 1.0 {man['files'][s.elements[lab]]['file']}")     # the mass is unused in an SCF
@@ -100,7 +103,8 @@ META_DFTS = {"TPSS", "SCAN", "R2SCAN", "M06L", "TB09"}    # QE input_dft names o
 class QESession:
     """One QEpy Driver (only one can exist per process) and the host-side grid bookkeeping."""
 
-    def __init__(self, case: Case, input_dft: str, workdir: str, comm, iterative: bool, pseudo_dir: str | None = None):
+    def __init__(self, case: Case, input_dft: str, workdir: str, comm, iterative: bool, pseudo_dir: str | None = None,
+                 outdir: str | None = None, restart: bool = False):
         from qepy.driver import Driver
         self.case, self.comm, self.input_dft = case, comm, input_dft
         self._meta = input_dft.upper() in META_DFTS
@@ -109,7 +113,8 @@ class QESession:
         os.makedirs(workdir, exist_ok=True)
         self.inputfile = os.path.join(workdir, "pw.in")
         if self.rank == 0:
-            open(self.inputfile, "w").write(pw_input(case, input_dft, pseudo_dir, os.path.join(workdir, "out"), "xcsb"))
+            open(self.inputfile, "w").write(pw_input(case, input_dft, pseudo_dir, outdir or os.path.join(workdir, "out"),
+                                                     "xcsb", restart=restart))
         comm.Barrier()
         self.driver = Driver(inputfile=self.inputfile, comm=comm, iterative=iterative,
                              logfile=os.path.join(workdir, "pw.out") if self.rank == 0 else None)
