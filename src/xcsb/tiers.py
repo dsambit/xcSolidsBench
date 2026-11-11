@@ -77,7 +77,8 @@ def all_cases():
     return {**CASES, **fe_payback.CASES}
 
 
-def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None = None, payback_diag: bool = False):
+def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None = None, payback_diag: bool = False,
+        maxiter: int | None = None, mixing_beta: float | None = None):
     """mode 'native': QE's input_dft = name (host_check: a libxc name for the host E_xc of the native density);
     mode 'hooked': the functional `name` through the hooks. Writes <out>/record.json."""
     from mpi4py import MPI
@@ -85,6 +86,12 @@ def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None =
     from .scf.driver import _write, run_hooked, run_native
     comm = MPI.COMM_WORLD
     case = all_cases()[case_name]()
+    deviations = {}
+    if mixing_beta is not None:                       # a labelled diagnostic deviation from the global/case beta
+        deviations["mixing_beta"] = {"case": case.mixing_beta, "used": mixing_beta}
+        case.mixing_beta = mixing_beta
+    if maxiter is not None:
+        deviations["maxiter"] = {"global": None, "used": maxiter}
     rec_path = os.path.join(out, "record.json")
     if mode == "native":
         try:
@@ -100,7 +107,8 @@ def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None =
             if payback_diag:
                 from .studies.fe_payback import attribution
                 post = lambda g, r, t: attribution(name, g, r, t)          # noqa: E731
-            rec = run_hooked(case, name, out, comm, record_path=rec_path, post=post)
+            kw = {"maxiter": maxiter} if maxiter is not None else {}
+            rec = run_hooked(case, name, out, comm, record_path=rec_path, post=post, deviations=deviations, **kw)
         except Exception as exc:
             rec = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"}
     rec["case_name"] = case_name

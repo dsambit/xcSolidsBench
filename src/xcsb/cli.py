@@ -36,6 +36,9 @@ def main(argv=None):
     s.add_argument("--root", required=True)
     s.add_argument("--host-check")
     s.add_argument("--payback-diag", action="store_true", help="frozen payback attribution on the converged density")
+    s.add_argument("--maxiter", type=int, help="diagnostic: MAXITER for this run (recorded as a deviation)")
+    s.add_argument("--mixing-beta", type=float, help="diagnostic: Broyden beta for this run (recorded as a deviation)")
+    s.add_argument("--tag", default="", help="suffix of the run directory (e.g. beta0.1)")
     c = sub.add_parser("compare", help="tier verdicts from the SCF records")
     c.add_argument("tier", choices=["v3", "v4", "v6"])
     c.add_argument("--root", required=True)
@@ -53,8 +56,8 @@ def main(argv=None):
         from mpi4py import MPI
 
         from . import tiers
-        out = tiers.run_dir(a.root, a.case, a.mode, a.name)
-        rec = tiers.scf(a.case, a.mode, a.name, out, a.host_check, a.payback_diag)
+        out = tiers.run_dir(a.root, a.case, a.mode, a.name) + (f"__{a.tag}" if a.tag else "")
+        rec = tiers.scf(a.case, a.mode, a.name, out, a.host_check, a.payback_diag, a.maxiter, a.mixing_beta)
         ok = MPI.COMM_WORLD.bcast(rec.get("status") == "ok", root=0)
         if MPI.COMM_WORLD.Get_rank() == 0:
             print(json.dumps({"case": a.case, "mode": a.mode, "name": a.name, "status": rec.get("status"),

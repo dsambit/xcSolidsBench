@@ -95,7 +95,7 @@ def run_native(case: Case, input_dft: str, workdir: str, comm, host_functional: 
 
 
 def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path: str | None = None,
-               maxiter: int = settings.MAXITER, chunk: int = CHUNK, post=None) -> dict:
+               maxiter: int = settings.MAXITER, chunk: int = CHUNK, post=None, deviations: dict | None = None) -> dict:
     """post: optional diagnostic called on the root with (grid, rho, tau) of the converged density; its dict is stored
     as rec["post"] (e.g. xcsb.studies.fe_payback.attribution)."""
     t0 = time.time()
@@ -125,7 +125,7 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
     rec = {"mode": "hooked", "functional": functional_name, "functional_provenance": f.provenance,
            "case": case.as_dict(), "provenance": code_provenance(), "history": [], "status": "running",
            "start": f"converged {settings.CARRIER_DFT} (QE native, exttype 0) in the same session, then the hook",
-           "carrier": carrier}
+           "carrier": carrier, "maxiter": maxiter, "deviations": deviations or {}}
     record_path = record_path or os.path.join(workdir, "record.json")
     e_prev = None
     try:
