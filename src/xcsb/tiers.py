@@ -31,6 +31,7 @@ TOL_V3_EIG = 1e-5      # Ry
 TOL_V3_MAG = 1e-4      # mu_B / cell
 TOL_V3_EXC = 1e-6      # relative, host E_xc on the native density vs QE etxc (QE's meta threshold points removed)
 TOL_V4_E = 1e-8        # Ry
+VALENCE = {"Si": 4, "Fe": 16}      # SG15 1.2 z_valence of the verification cells (pseudo/MANIFEST.json)
 FE_MIXING = 0.3        # verification Fe cells: Broyden beta (the global default; 0.1 did not help from the old start)
 
 
@@ -118,8 +119,18 @@ def _cmp(nat, a, b):
     if flipped:
         half = eigb.shape[1] // 2
         eigb = np.concatenate([eigb[:, half:], eigb[:, :half]], axis=1)
+    # occupied and partly occupied bands only: QE converges empty bands loosely (diago_full_acc = .false.)
+    case = a["case"]
+    if case["occupations"] == "smearing":
+        occ = eiga <= a["fermi_ry"] + 3.0 * case["degauss"]
+    else:
+        st = case["structure"]
+        nocc = sum(VALENCE[st["elements"][lab]] for lab in st["labels"]) // 2        # fixed occupations, nspin 1
+        occ = np.zeros_like(eiga, dtype=bool)
+        occ[:nocc] = True
     out = {"etot_native": ea, "etot_hooked": eb, "d_etot_per_atom": abs(ea - eb) / nat,
-           "d_eig_max": float(np.max(np.abs(eiga - eigb))) if eiga.shape == eigb.shape else None,
+           "d_eig_max": float(np.max(np.abs(eiga - eigb)[occ])) if eiga.shape == eigb.shape else None,
+           "d_eig_max_all_bands": float(np.max(np.abs(eiga - eigb))) if eiga.shape == eigb.shape else None,
            "mag_native": ma, "mag_hooked": mb, "spin_flipped": flipped,
            "d_mag_total": abs(abs(ma["total"]) - abs(mb["total"])), "d_mag_abs": abs(ma["absolute"] - mb["absolute"]),
            "iterations_hooked": b.get("iterations")}
