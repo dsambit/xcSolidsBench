@@ -50,7 +50,8 @@ K_RATIO = {"NiO": (1.0, 0.5, 1.0), "MnO": (1.0, 1.0, 0.5)}   # k mesh = n x rati
 TM = {"NiO": "Ni", "MnO": "Mn"}
 ZVAL = {"Ni": 18, "Mn": 15, "O": 6}
 N_EMPTY = 8
-FUNCTIONALS = ("PBE", "r2SCAN", "r2SCAN-SB", "r2SCAN-SB-kin")
+FUNCTIONALS = ("PBE", "r2SCAN", "r2SCAN-SB", "r2SCAN-SB-kin", "r2SCAN-SB(omega=90)")   # SB: omega 10 (user 2026-11-12);
+                                                                                      # omega 90 (the note's value): labelled comparison
 SCAN_ECUT = (60.0, 80.0, 100.0, 120.0, 140.0)
 SCAN_K = 4                      # k level n: mesh = n x K_RATIO
 RUNGS = (1.0, 1.5, 2.0)

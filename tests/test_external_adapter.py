@@ -61,3 +61,11 @@ def test_sb_cases():
     assert len([x for x in t if x["stage"] == "S"]) == 2 * 4 + 3 * 4 and len([x for x in t if x["stage"] == "R"]) == 4 + 6
     rr = [x for x in t if x["stage"] == "R"]
     assert S.command("/r", rr[0])[-4:] == ["--tag", "cb0.1", "--carrier-beta", "0.1"] and "--sb-diag" in S.command("/r", rr[-1])
+
+
+def test_default_omega_and_names():
+    from xcsb.functional.external import DEFAULT_OMEGA, parse_external
+    assert DEFAULT_OMEGA == 10.0
+    assert parse_external("r2SCAN-SB") == ("r2SCAN-SB", None) and parse_external("r2SCAN-SB-kin(omega=90)") == ("r2SCAN-SB-kin", 90.0)
+    from xcsb.tiers import run_dir
+    assert run_dir("/r", "SB-Fe", "hooked", "r2SCAN-SB(omega=90)").endswith("SB-Fe__hooked__r2SCAN-SB(omega90)")

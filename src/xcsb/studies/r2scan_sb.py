@@ -9,7 +9,8 @@ between functionals at identical settings.
 
 Cases: SB-<El> (free moment) and SB-Fe-fsm-<m> (tot_magnetization m, m in FSM_M). Functionals: PBE, r2SCAN (reference
 functionals: computed once at this protocol and banked; the earlier Fe80 runs used a = 2.866 A, not these settings),
-r2SCAN-SB (R0 half split, primary), r2SCAN-SB-kin."""
+r2SCAN-SB (R0 half split, primary), r2SCAN-SB-kin: omega 10 since the user decision of 2026-11-12 (external.DEFAULT_OMEGA; the
+runs before it were made at omega 90 and are relabelled 'r2SCAN-SB(omega=90)' / 'r2SCAN-SB-kin(omega=90)')."""
 from __future__ import annotations
 
 import json
@@ -20,7 +21,8 @@ from ..host.qe import Case
 
 A_STATIC = {"Fe": ("bcc", 2.858, "refdata solids/lattice_constants_static_2026-11-11"),
             "Ni": ("fcc", 3.507, "refdata solids/lattice_constants_static_ni_2026-11-11")}
-FUNCTIONALS = ("PBE", "r2SCAN", "r2SCAN-SB", "r2SCAN-SB-kin")
+FUNCTIONALS = ("PBE", "r2SCAN", "r2SCAN-SB", "r2SCAN-SB-kin")      # r2SCAN-SB / -kin: omega 10 (external.DEFAULT_OMEGA)
+OMEGA90 = ("r2SCAN-SB(omega=90)", "r2SCAN-SB-kin(omega=90)")          # the runs of jobs 61167271 / 61170583 (relabelled 2026-11-12)
 FSM_M = (2.2, 2.4, 2.6)
 
 
@@ -91,7 +93,7 @@ def table(run):
            "caveat": "SG15 ONCV without NLCC: absolute moments carry a pseudopotential error; compare functionals at equal settings",
            "free": {}, "fsm_Fe": {}}
     for el in A_STATIC:
-        for f in FUNCTIONALS:
+        for f in FUNCTIONALS + OMEGA90:
             r = record(run, {"case": f"SB-{el}", "functional": f})
             if el == "Ni":                                  # the stage-R rerun (carrier beta 0.1) replaces the aborted runs
                 r2 = record(run, {"case": "SB-Ni", "functional": f, "tag": f"cb{NI_CARRIER_BETA:g}"})
@@ -101,7 +103,7 @@ def table(run):
                                          "abs_m": (r.get("magnetization") or {}).get("absolute"),
                                          "etot_ry": (r.get("energies_ry") or {}).get("etot"), "iterations": r.get("iterations"),
                                          "error": r.get("error")})
-    for f in FUNCTIONALS:
+    for f in FUNCTIONALS + OMEGA90:
         rows = {}
         for m in FSM_M:
             r = record(run, {"case": f"SB-Fe-fsm-{m:.1f}", "functional": f})
@@ -112,7 +114,7 @@ def table(run):
     out["omega_diag_Fe"] = {}
     for w in OMEGA_DIAG + (90.0,):
         for base in ("r2SCAN-SB", "r2SCAN-SB-kin"):
-            f = base if w == 90.0 else f"{base}(omega={w:g})"
+            f = f"{base}(omega={w:g})"
             r = record(run, {"case": "SB-Fe", "functional": f})
             out["omega_diag_Fe"][f] = None if r is None else {
                 "status": r.get("status"), "m": (r.get("magnetization") or {}).get("total"),

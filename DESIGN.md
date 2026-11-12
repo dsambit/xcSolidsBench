@@ -664,6 +664,13 @@ records (sha256 checked), plus explore/spin_balance (the E1 reference function).
   the TPSS carrier start (random wavefunctions: the SG15 files carry no atomic orbitals; divergence at iteration 3 at β 0.3); with
   the carrier phase at β 0.1 (a recorded deviation of the start only) all converged: PBE 0.691, r2SCAN 0.696, r2SCAN-SB 0.683,
   r2SCAN-SB-kin 0.694 μB.
+  DECISION (user 2026-11-12): r2SCAN-SB means ω = 10 from now on (the half-split form; Fe 2.325 vs our PBE 2.359 μB; a linear
+  interpolation between ω 10 and 30 would put the exact match near ω ≈ 16; 10 is the user's choice): `external.DEFAULT_OMEGA`, with
+  the provenance "ω = 10, chosen by the user to match OUR PBE Fe moment in this setup (SG15, 80/320 Ry, a 2.858 Å); not the
+  Perdew-group value (90 in their note)". r2SCAN-SB-kin takes ω = 10 as well, for consistency (it is insensitive to ω). The
+  earlier default runs (ω = 90) are relabelled 'r2SCAN-SB(omega=90)' / 'r2SCAN-SB-kin(omega=90)' (run directories renamed,
+  RELABEL_omega90.json; records unchanged, their provenance carries ω = 90). The NiO/MnO job runs r2SCAN-SB at ω = 10 plus
+  r2SCAN-SB(omega=90) as a labelled comparison.
 
 ### 6.11 v4: AFM NiO and MnO gaps (user 2026-11-11; staged: `xcsb.studies.tmo_gap`, `job_tmo_gap.sh`)
 

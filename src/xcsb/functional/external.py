@@ -26,11 +26,19 @@ from .contract import PointFunctional, PointInputs, PointOutputs
 EXTERNAL = {"r2SCAN-SB": ("explore/spin_balance/sb_r2scan.py", "evaluate_arrays"),
             "r2SCAN-SB-kin": ("explore/spin_balance/sb_r2scan.py", "evaluate_arrays")}
 LINE = {"r2SCAN-SB": "v4-sb", "r2SCAN-SB-kin": "v4-sb"}
+# omega of the names WITHOUT an explicit '(omega=<w>)' (user decision 2026-11-12): 10, chosen by the user to match OUR PBE Fe moment
+# in this setup (SG15, 80/320 Ry, 8^3 k, Gaussian 0.02, a 2.858 A: r2SCAN-SB 2.325 vs PBE 2.359 mu_B at omega 10; a linear
+# interpolation between omega 10 and 30 would put the exact match near 16); NOT the Perdew-group value (90 in their note).
+# r2SCAN-SB-kin takes the same default for consistency (its moment is insensitive to omega). Explicit names keep any omega, e.g.
+# 'r2SCAN-SB(omega=90)' for the runs made before this decision.
+DEFAULT_OMEGA = 10.0
+DEFAULT_OMEGA_NOTE = ("omega = 10, chosen by the user (2026-11-12) to match OUR PBE Fe moment in this setup (SG15, 80/320 Ry, "
+                      "a 2.858 A); not the Perdew-group value (90 in their note)")
 
 
 def parse_external(name: str):
-    """'r2SCAN-SB' -> ('r2SCAN-SB', None); 'r2SCAN-SB-kin(omega=10)' -> ('r2SCAN-SB-kin', 10.0): a gate-width DIAGNOSTIC (the
-    published functional has omega 90; omega = 0 is the lam = 1 ceiling, diagnostic only)."""
+    """'r2SCAN-SB' -> ('r2SCAN-SB', None) (omega DEFAULT_OMEGA); 'r2SCAN-SB-kin(omega=90)' -> ('r2SCAN-SB-kin', 90.0): an explicit
+    gate width (omega = 0 is the lam = 1 ceiling, diagnostic only)."""
     m = re.fullmatch(r"(r2SCAN-SB(?:-kin)?)(?:\(omega=([0-9.eE+-]+)\))?", name)
     if not m:
         raise KeyError(f"{name!r}: external functionals {sorted(EXTERNAL)} (optionally '(omega=<w>)')")
@@ -60,12 +68,14 @@ class ExternalFunctional(PointFunctional):
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         r0_form = mod.NAMES[base]
-        omega = float(mod.OMEGA) if w_override is None else w_override
+        omega = DEFAULT_OMEGA if w_override is None else w_override
         fun = getattr(mod, fn)
         self.name = name
         self._f = lambda nm, rho, grad, tau: fun(rho, grad, tau, r0_form=r0_form, omega=omega)
         self._prov = {"name": name, "kind": "external", "xchole_commit": commit, "module": rel, "function": fn,
-                      "r0_form": r0_form, "omega": omega, "omega_is_module_default": w_override is None,
+                      "r0_form": r0_form, "omega": omega, "omega_source": (DEFAULT_OMEGA_NOTE if w_override is None
+                                                                           else "explicit in the name"),
+                      "module_omega": float(mod.OMEGA),
                       "module_sha256": hashlib.sha256(open(path, "rb").read()).hexdigest()}
 
     @property
