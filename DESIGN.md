@@ -615,6 +615,19 @@ records (sha256 checked), plus explore/spin_balance (the E1 reference function).
   decade) of ζ, |∇ζ|/(2k_F) and |∇ζ|/(2k_s) (k_s = √(4k_F/π)), c_θ = ∇ζ·∇n/(|∇ζ||∇n|), w_c′, with the He-pair and flat pieces
   along m. Cross-check first: the reference function on v4's testpoints_sb.json (every stored key; whether it was regenerated
   with R0 kin for both sets is recorded).
+  ω scan (user 2026-11-11): E1 as defined at ω ∈ {10, 30, 90, 300, 1000} plus λ = 1: implied moment, E_xc″ at m = 0 and at
+  the implied moment, retained δ_m fraction in the 3d region. A SENSITIVITY diagnostic only: Fe/Co/Ni moments are a hold-out and
+  never choose ω (ω is a run-time argument of the reference function: no extra compile).
+- Item 3, self-consistent spin-balanced r2SCAN (`xcsb.studies.r2scan_sb`, `xcsb.functional.external`, `job_r2scan_sb.sh`, run dir
+  `$W/runs/xcsb/v4_2026-11-12_r2scan_sb`): the Perdew-group functional as implemented on strongxc-v4
+  (explore/spin_balance/sb_r2scan.py; names r2SCAN-SB (R0 half, primary), r2SCAN-SB-kin; ω = 90) through an external per-point
+  adapter (rho, grad rho, tau per spin; exact first derivatives from the external code; no Laplacian; interface in the adapter's
+  docstring); xchole line v4-sb, pin set when the functional lands. Phase 0: the energy-vs-potential FD check
+  (tests/test_external_fd.py). PBE, r2SCAN, r2SCAN-SB, r2SCAN-SB-kin at identical settings (80/320 Ry, 8³ k, Gaussian 0.02,
+  conv_thr 1e-8, β 0.3, FM start) on bcc Fe (static 2.858 Å) and fcc Ni (static 3.507 Å; archive
+  solids/lattice_constants_static_ni_2026-11-11); Fe also at m = 2.2, 2.4, 2.6. hcp Co: not in the Zhang et al. tables (open:
+  a sourced static Co lattice and c/a). The 80 Ry cutoff is the Fe setting; the ladder has not covered Ni. PBE and r2SCAN are
+  computed once at this protocol and banked (the earlier Fe80 runs used a = 2.866 Å).
 
 ## 7. Verification tiers
 

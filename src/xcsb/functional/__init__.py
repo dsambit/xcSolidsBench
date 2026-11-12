@@ -17,6 +17,9 @@ def get(name: str) -> PointFunctional:
     if name.split("@")[0] in XCHOLE_NAMES:
         from .xchole import XcholeFunctional
         return XcholeFunctional(name)
+    if name in ("r2SCAN-SB", "r2SCAN-SB-kin"):
+        from .external import ExternalFunctional
+        return ExternalFunctional(name)
     if name == "model:test":
         from .model import TestFunctional
         return TestFunctional()

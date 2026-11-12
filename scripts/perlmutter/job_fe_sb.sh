@@ -15,6 +15,6 @@ python -c "import os, xcsb, sys; sys.exit(0 if os.path.abspath(xcsb.__file__).st
   || { echo "STOP: xcsb is not imported from $REPO" >> "$RUN/summary.txt"; exit 0; }
 echo "$JOB $(git rev-parse HEAD) xchole $(git -C "$(dirname "$XCSB_XCHOLE_SRC")" rev-parse HEAD) line v4 $(date -Is)" >> "$RUN/COMMITS"
 ARGS=(--fsm "$F1"); [ -n "$F2" ] && [ -d "$F2" ] && ARGS+=(--fsm "$F2")
-timeout ${XCSB_STEP_S:-3300} srun -N 1 -n 1 -c 256 --cpu-bind=none python -m xcsb.studies.fe_sb_frozen "${ARGS[@]}" --out "$RUN" \
+timeout $(( ${XCSB_ALLOC_S:-5400} - 300 )) srun -N 1 -n 1 -c 256 --cpu-bind=none python -m xcsb.studies.fe_sb_frozen "${ARGS[@]}" --out "$RUN" \
     > "$RUN/sb_$JOB.log" 2>&1
 echo "fe_sb_frozen rc=$? $(date -Is)" >> "$RUN/summary.txt"

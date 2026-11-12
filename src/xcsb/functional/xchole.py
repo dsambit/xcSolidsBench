@@ -29,11 +29,16 @@ XCHOLE_PINS = {                                              # line -> pinned xc
     # strongxc-v4 dd8b5a517 (user 2026-11-11, the v4 Fe items): the same sets (src/xchole/sch_si, core, ueg_gauge, benchmarks and
     # explore/xc_pairing identical to 0e9e8ee28, records byte-identical) plus explore/spin_balance (the E1 reference function)
     "v4": "dd8b5a517b45740cbbd409fb92a187eb1cd68e43",
+    # strongxc-v4 with explore/spin_balance/sb_r2scan.py (the Perdew-group spin-balanced r2SCAN, xcsb.functional.external):
+    # NOT SET until the spin-balance agent reports its commit (then: model sources and records checked identical, set here)
+    "v4-sb": None,
 }
 XCHOLE_LINE = os.environ.get("XCSB_XCHOLE_LINE", "v3.1")
 if XCHOLE_LINE not in XCHOLE_PINS:
     raise KeyError(f"XCSB_XCHOLE_LINE {XCHOLE_LINE!r}: one of {sorted(XCHOLE_PINS)}")
 XCHOLE_PIN = XCHOLE_PINS[XCHOLE_LINE]
+if XCHOLE_PIN is None:
+    raise RuntimeError(f"xchole line {XCHOLE_LINE!r}: pin not set yet (waiting for the commit of the spin-balance functional)")
 RECORD_SHA256 = {                                            # installed records at the pin (src/xchole/sch_si/parameter_sets)
     "SCH-SI-A:v3.1": ("SCH-SI-A-v3.1.json", "cbd4b9c58bda0b15a6857bd463197c5e3c82da6ec2263a4232a09a9e8974280f"),
     "SCH-SI-B:v3.1": ("SCH-SI-B-v3.1.json", "5b9d3a24162b78f8314319b13085d46f2da84e5a983096bfe6c1fd217bbda277"),

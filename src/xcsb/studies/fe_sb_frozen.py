@@ -8,6 +8,8 @@ Variants (base | ref | omega | placement | R0):
     PBE ref   PBE,     omega 90, base, R0 kin       (labelled row)
     R0 half   ueg_end, omega 90, base, R0 half      (labelled row)
     lam = 1   ueg_end, omega 0,  base, R0 kin       (no gate: diagnostic ceiling only; omega = 0 is excluded as a model)
+    omega scan ueg_end, omega 10, 30, 300, 1000, base, R0 kin (with 90 = default: a sensitivity diagnostic only; the Fe/Co/Ni
+              moments are a hold-out, never used to choose omega)
 Per point and variant: Delta E = sum w de (Ry), the frozen corrected E(m) = E_tot(m) + Delta E and E_xc(m) + Delta E; per curve: the
 implied moment (spline minimum) and E'', E_xc'' at m = 0 (even fit over m <= 0.3) and at the implied moment; the gate diagnostics
 (sb_model.GateAccumulator: |delta_m|-weighted lam by indicator bins, retained fractions, electron fraction with lam < 0.5) overall
@@ -31,6 +33,10 @@ import numpy as np
 
 VARIANTS = {"default": ("ueg_end", 90.0, "base", "kin"), "PBE_ref": ("PBE", 90.0, "base", "kin"),
             "R0_half": ("ueg_end", 90.0, "base", "half"), "lam1_no_gate": ("ueg_end", 0.0, "base", "kin")}
+# omega SCAN of E1 as defined (user 2026-11-11): a SENSITIVITY diagnostic only; Fe/Co/Ni moments are a hold-out and are never
+# used to choose omega. omega is a run-time argument of the reference function (no extra compile).
+OMEGA_SCAN = (10.0, 30.0, 300.0, 1000.0)
+VARIANTS.update({f"omega{w:g}": ("ueg_end", w, "base", "kin") for w in OMEGA_SCAN})
 BASES = {"A": "SCH-SI-A_v3.1", "B": "SCH-SI-B_v3.1"}
 R_3D = 1.3                     # bohr: radius of the 3d region around the Fe site (the 3d radial density peaks near 0.6 bohr)
 DECADES = (1e-4, 1e-3, 1e-2, 1e-1, 1.0, 10.0, np.inf)
