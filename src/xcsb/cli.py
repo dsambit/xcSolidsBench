@@ -46,6 +46,9 @@ def main(argv=None):
     s.add_argument("--ripple", choices=["all", "high", "low"],
                    help="M1: ripple-seeded restarts after convergence, both wavenumber bands or one (studies.m1_ladder)")
     s.add_argument("--m1-diag", action="store_true", help="M1: BR-concave electron fraction of the converged density")
+    s.add_argument("--warm-from", help="production warm start (user-approved per point): a converged run directory whose QE "
+                   "outdir (wavefunctions, rho, tau) is read; the point's earlier failed record is kept")
+    s.add_argument("--warm-label", help="the start label in the record and the tables, e.g. 'warm start from m = 2.6'")
     m1 = sub.add_parser("m1", help="M1 cutoff ladder: task list, E_c^PBE, tables (serial; no QE)")
     m1.add_argument("what", choices=["tasks", "ec", "table", "report-p"])
     m1.add_argument("--run", required=True)
@@ -73,7 +76,7 @@ def main(argv=None):
         from . import tiers
         out = tiers.run_dir(a.root, a.case, a.mode, a.name) + (f"__{a.tag}" if a.tag else "")
         rec = tiers.scf(a.case, a.mode, a.name, out, a.host_check, a.payback_diag, a.maxiter, a.mixing_beta, a.mag_split,
-                        a.fsm_parts, a.npool, a.ripple, a.m1_diag)
+                        a.fsm_parts, a.npool, a.ripple, a.m1_diag, a.warm_from, a.warm_label)
         ok = MPI.COMM_WORLD.bcast(rec.get("status") == "ok", root=0)
         if MPI.COMM_WORLD.Get_rank() == 0:
             print(json.dumps({"case": a.case, "mode": a.mode, "name": a.name, "status": rec.get("status"),

@@ -78,7 +78,10 @@ def main(run, out=None):
     data, free = load(run)
     res = {}
     for f in FUNCS:
-        pts = {m: r for m, r in data.get(f, {}).items() if r.get("status") == "ok" and m <= 3.0 + 1e-9}
+        # the m grid only (points with --fsm-parts); the phase-0 constraint checks (m = 2.7400, 2.7646) are not curve points
+        pts = {m: r for m, r in data.get(f, {}).items() if r.get("status") == "ok" and m <= 3.0 + 1e-9
+               and "E_x_ry" in (r.get("post") or {}).get("fsm_parts", {})}
+        missing = sorted((m, r.get("status")) for m, r in data.get(f, {}).items() if r.get("status") != "ok" and m <= 3.0 + 1e-9)
         if len(pts) < 4:
             res[f] = {"status": f"only {len(pts)} converged points"}
             continue
@@ -97,6 +100,8 @@ def main(run, out=None):
                "dEc_dm_meV": (g(Ec) * RY_TO_MEV).tolist(), "dRest_dm_meV": (g(R) * RY_TO_MEV).tolist(),
                "predicted_moment": mfree, "E_min_ry": efree,
                "iterations": [r.get("iterations") for r in rec],
+               "start": [(r.get("warm_start") or {}).get("label", "cold") for r in rec],
+               "missing_m_unconverged": missing,
                "m_achieved": [r["magnetization"]["total"] for r in rec],
                "abs_m": [r["magnetization"]["absolute"] for r in rec]}
         row["stoner"] = stoner(ms, E, Ex + Ec, {k: [p.get("pieces_ry", {}).get(k, np.nan) for p in post]
@@ -130,14 +135,17 @@ def main(run, out=None):
         if "m" not in row:
             print(f, row)
             continue
-        print(f"== {f}: predicted moment {row['predicted_moment']:.3f}", row.get("free_scf", ""))
+        print(f"== {f}: predicted moment {row['predicted_moment']:.3f}", row.get("free_scf", ""),
+              f"[curve WITHOUT m = {', '.join(f'{x:g} ({st})' for x, st in row['missing_m_unconverged'])}]"
+              if row["missing_m_unconverged"] else "")
         for i, m in enumerate(row["m"]):
             extra = ""
             if "m_weighted_w_c" in row:
                 extra = f" w_x {row['m_weighted_w_x_up'][i]:.3f}/{row['m_weighted_w_x_dn'][i]:.3f} w_c {row['m_weighted_w_c'][i]:.3f}"
             print(f"  m {m:.1f} E {row['E_tot_ry'][i]:.6f} dE {row['E_minus_E0_meV'][i]:9.1f} meV  Ex {row['E_x_ry'][i]:.6f} "
                   f"Ec {row['E_c_ry'][i]:.6f}  dE/dm {row['dE_dm_meV'][i]:8.1f} = x {row['dEx_dm_meV'][i]:8.1f} + c "
-                  f"{row['dEc_dm_meV'][i]:7.1f} + rest {row['dRest_dm_meV'][i]:8.1f}" + extra)
+                  f"{row['dEc_dm_meV'][i]:7.1f} + rest {row['dRest_dm_meV'][i]:8.1f}" + extra
+                  + ("" if row["start"][i] == "cold" else f"  [{row['start'][i]}]"))
         for v, pv in row.get("pairing", {}).items():
             print(f"  pairing {v}: implied moment {pv['implied_moment']:.3f}")
 

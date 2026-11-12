@@ -96,12 +96,16 @@ def run_native(case: Case, input_dft: str, workdir: str, comm, host_functional: 
 
 def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path: str | None = None,
                maxiter: int = settings.MAXITER, chunk: int = CHUNK, post=None, deviations: dict | None = None,
-               npool: int = 1, seeds=None) -> dict:
+               npool: int = 1, seeds=None, warm_start: dict | None = None, previous_attempts: list | None = None) -> dict:
     """post: optional diagnostic called on the root with (grid, rho, tau) of the converged density; its dict is stored
     as rec["post"] (e.g. xcsb.studies.fe_payback.attribution).
     seeds: optional ripple-seeded restarts after convergence (xcsb.studies.m1_ladder.SeedPlan): each seed overwrites QE's
     (rho, tau) with the seeded fields built from the converged ones and re-converges in the same session (QE's orbitals as
-    the start, the Broyden history kept); results in rec["ripple"]. The record of the unseeded SCF is complete before."""
+    the start, the Broyden history kept); results in rec["ripple"]. The record of the unseeded SCF is complete before.
+    warm_start: optional {"from": a converged run directory, "label": text}: a production restart (user-approved per point, never
+    a robustness test): that run's QE outdir (wavefunctions, rho, tau) is copied and read by QE (startingwfc and startingpot
+    'file'), and the hook starts directly from it (no carrier phase). previous_attempts: earlier failed records of this point,
+    kept in rec["previous_attempts"]."""
     t0 = time.time()
     rank = comm.Get_rank()
     f = get_functional(functional_name)
@@ -111,27 +115,50 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
     # [0, 1] (Gaussian smearing), tau >= tau_W (DESIGN 4.5). Found in M0: the atomic superposition is not positive (SG15
     # Fe: 0.85 e of negative charge); the bare starting orbitals' density is far from self-consistency (Fe: dr2 ~ 7e2 Ry);
     # a save/restart through QE's files changed the density (Fe: 0.054 e negative after reading back).
-    s = QESession(case, settings.CARRIER_DFT, workdir, comm, iterative=True, npool=npool)
-    carrier = {"history": []}
-    tc = time.time()
-    for it in range(1, maxiter + 1):
-        s.driver.diagonalize()
-        s.driver.mix(mix_coef=case.mixing_beta)
-        dr2 = float(s.driver.get_scf_error())
-        conv = bool(s.driver.qepy_modules.control_flags.get_conv_elec())
-        carrier["history"].append({"iter": it, "dr2": dr2, **s.magnetization()})
-        if conv:
-            break
+    warm = None
+    if warm_start is not None:
+        import shutil
+        src_rec = json.load(open(os.path.join(warm_start["from"], "record.json")))
+        if src_rec.get("status") != "ok":
+            raise SCFError(f"warm start: {warm_start['from']} is not a converged run ({src_rec.get('status')})")
+        if rank == 0:
+            dst = os.path.join(workdir, "out")
+            if os.path.exists(dst):
+                shutil.rmtree(dst)
+            shutil.copytree(os.path.join(warm_start["from"], "out"), dst)
+        comm.Barrier()
+        warm = {"label": warm_start["label"], "from": os.path.abspath(warm_start["from"]),
+                "source": {"etot_ry": src_rec["energies_ry"]["etot"], "magnetization": src_rec["magnetization"],
+                           "case": src_rec["case"], "xcsb_commit": src_rec["provenance"].get("xcsb_commit")}}
+    s = QESession(case, settings.CARRIER_DFT, workdir, comm, iterative=True, npool=npool, restart=warm is not None)
+    if warm is None:
+        carrier = {"history": []}
+        tc = time.time()
+        for it in range(1, maxiter + 1):
+            s.driver.diagonalize()
+            s.driver.mix(mix_coef=case.mixing_beta)
+            dr2 = float(s.driver.get_scf_error())
+            conv = bool(s.driver.qepy_modules.control_flags.get_conv_elec())
+            carrier["history"].append({"iter": it, "dr2": dr2, **s.magnetization()})
+            if conv:
+                break
+        else:
+            raise SCFError(f"start: the carrier {settings.CARRIER_DFT} did not converge in {maxiter} iterations")
+        carrier.update(iterations=it, magnetization=s.magnetization(), seconds=time.time() - tc)
+        # QEpy marks an exttype-0 run as finished at convergence (rho is then the output density); the hook continues it
+        s.driver.embed.finish = False
+        start = f"converged {settings.CARRIER_DFT} (QE native, exttype 0) in the same session, then the hook"
     else:
-        raise SCFError(f"start: the carrier {settings.CARRIER_DFT} did not converge in {maxiter} iterations")
-    carrier.update(iterations=it, magnetization=s.magnetization(), seconds=time.time() - tc)
-    # QEpy marks an exttype-0 run as finished at convergence (rho is then the output density); the hook continues it
-    s.driver.embed.finish = False
+        carrier = {"history": [], "iterations": 0, "skipped": "warm start", "magnetization": s.magnetization()}
+        start = warm["label"]
     rec = {"mode": "hooked", "functional": functional_name, "functional_provenance": f.provenance,
            "case": case.as_dict(), "provenance": code_provenance(), "history": [], "status": "running",
-           "start": f"converged {settings.CARRIER_DFT} (QE native, exttype 0) in the same session, then the hook",
-           "carrier": carrier, "maxiter": maxiter, "deviations": deviations or {},
+           "start": start, "carrier": carrier, "maxiter": maxiter, "deviations": deviations or {},
            "parallel": {"ranks": comm.Get_size(), "npool": npool, "chunk": chunk}}
+    if warm is not None:
+        rec["warm_start"] = warm
+    if previous_attempts:
+        rec["previous_attempts"] = previous_attempts
     record_path = record_path or os.path.join(workdir, "record.json")
 
     def hook_loop(history, label):

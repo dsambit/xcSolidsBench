@@ -45,3 +45,12 @@ def test_sha_mismatch_raises(tmp_path):
     bad.write_text(open(src).read() + "\n")
     with pytest.raises(PseudoError):
         check_element("Fe", str(tmp_path))
+
+
+@needs_pseudos
+def test_restart_input():
+    """A production warm start (startingwfc and startingpot 'file') of an FSM point."""
+    c = Case(bcc("Fe", 5.42), ecutwfc=80.0, kmesh=(8, 8, 8), degauss=0.02, nspin=2, starting_magnetization={"Fe": 0.5},
+             tot_magnetization=2.8)
+    txt = pw_input(c, "TPSS", PDIR, "/tmp/out", "xcsb", restart=True)
+    assert "startingwfc = 'file'" in txt and "startingpot = 'file'" in txt and "tot_magnetization = 2.800000" in txt

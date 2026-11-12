@@ -315,6 +315,13 @@ failure (MAXITER, negative ρ_σ, NaN, any QE error): raise; the record is writt
 
 ---
 
+**Warm starts (user 2026-11-11, per point).** A production point that fails from the cold start may, with the user's go for
+that point, be rerun from a converged neighbour: that run's QE outdir (wavefunctions, ρ, τ) is copied and read by QE
+(startingwfc and startingpot 'file') and the hook starts directly from it (no carrier phase). The record carries the label
+(e.g. "warm start from m = 2.6"), the source run, and the earlier failed attempts (`record_attempt<n>.json`, summarized with
+their dr2 history); every table shows the label. conv_thr is never relaxed. Robustness tests stay cold. First use: Fe FSM
+m = 2.8, SCH-SI-B:v3.1 (cold: 200 hook iterations, last dr2 2.08·10⁻⁸ Ry against 10⁻⁸; job 61150345).
+
 ## 6. (d) Benchmark layer
 
 ### 6.0 Convergence protocol (all families)

@@ -94,7 +94,8 @@ def get_case(name):
 
 def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None = None, payback_diag: bool = False,
         maxiter: int | None = None, mixing_beta: float | None = None, mag_split: bool = False, fsm_parts: bool = False,
-        npool: int = 1, ripple: str | None = None, m1_diag: bool = False):
+        npool: int = 1, ripple: str | None = None, m1_diag: bool = False, warm_from: str | None = None,
+        warm_label: str | None = None):
     """mode 'native': QE's input_dft = name (host_check: a libxc name for the host E_xc of the native density);
     mode 'hooked': the functional `name` through the hooks. Writes <out>/record.json."""
     from mpi4py import MPI
@@ -148,12 +149,50 @@ def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None =
                 return out
             post = run_posts if posts else None
             kw = {"maxiter": maxiter} if maxiter is not None else {}
+            warm, previous = None, None
+            if warm_from:
+                if not warm_label:
+                    raise ValueError("a warm start needs its label (e.g. 'warm start from m = 2.6')")
+                warm = {"from": warm_from, "label": warm_label}
+                previous = keep_previous_attempts(out, comm)
             rec = run_hooked(case, name, out, comm, record_path=rec_path, post=post, deviations=deviations, npool=npool,
-                             seeds=seeds, **kw)
+                             seeds=seeds, warm_start=warm, previous_attempts=previous, **kw)
         except Exception as exc:
             rec = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"}
     rec["case_name"] = case_name
     return rec
+
+
+def keep_previous_attempts(out, comm):
+    """A failed record of this point is kept: moved to record_attempt<n>.json (n = 1, 2, ...) and summarized (status,
+    error, start, iterations, the full dr2 history) for the new record. Raises if the point already has an ok record."""
+    import shutil
+    summary, err = None, None
+    if comm.Get_rank() == 0:
+        p = os.path.join(out, "record.json")
+        summary = []
+        n = 1
+        while os.path.exists(os.path.join(out, f"record_attempt{n}.json")):
+            summary.append(_attempt(json.load(open(os.path.join(out, f"record_attempt{n}.json"))), n))
+            n += 1
+        if os.path.exists(p):
+            r = json.load(open(p))
+            if r.get("status") == "ok":
+                err = f"{p}: the point is already converged; nothing to rerun"
+            else:
+                shutil.move(p, os.path.join(out, f"record_attempt{n}.json"))
+                summary.append(_attempt(r, n))
+    summary, err = comm.bcast((summary, err), root=0)
+    if err:
+        raise RuntimeError(err)
+    return summary
+
+
+def _attempt(r, n):
+    return {"attempt": n, "file": f"record_attempt{n}.json", "status": r.get("status"), "error": r.get("error"),
+            "start": r.get("start"), "carrier_iterations": (r.get("carrier") or {}).get("iterations"),
+            "hook_iterations": len(r.get("history", [])), "dr2_history": [h.get("dr2") for h in r.get("history", [])],
+            "xcsb_commit": (r.get("provenance") or {}).get("xcsb_commit")}
 
 
 def run_dir(root, case_name, mode, name):
