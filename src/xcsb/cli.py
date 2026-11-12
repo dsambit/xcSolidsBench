@@ -48,6 +48,8 @@ def main(argv=None):
     s.add_argument("--m1-diag", action="store_true", help="M1: BR-concave electron fraction of the converged density")
     s.add_argument("--e1-diag", action="store_true", help="v4: the E1 term's parts and gate diagnostics on the converged density")
     s.add_argument("--tmo-diag", action="store_true", help="TM oxides: the TM site moments within R_SITE")
+    s.add_argument("--sb-diag", action="store_true", help="r2SCAN-SB: the term, lam distribution, overall and 3d region")
+    s.add_argument("--carrier-beta", type=float, help="a recorded deviation: the Broyden beta of the carrier (start) phase only")
     s.add_argument("--warm-from", help="production warm start (user-approved per point): a converged run directory whose QE "
                    "outdir (wavefunctions, rho, tau) is read; the point's earlier failed record is kept")
     s.add_argument("--warm-label", help="the start label in the record and the tables, e.g. 'warm start from m = 2.6'")
@@ -81,7 +83,7 @@ def main(argv=None):
         out = tiers.run_dir(a.root, a.case, a.mode, a.name) + (f"__{a.tag}" if a.tag else "")
         rec = tiers.scf(a.case, a.mode, a.name, out, a.host_check, a.payback_diag, a.maxiter, a.mixing_beta, a.mag_split,
                         a.fsm_parts, a.npool, a.ripple, a.m1_diag, a.e1_diag, a.tmo_diag, a.warm_from, a.warm_label,
-                        a.warm_mode)
+                        a.warm_mode, a.sb_diag, a.carrier_beta)
         ok = MPI.COMM_WORLD.bcast(rec.get("status") == "ok", root=0)
         if MPI.COMM_WORLD.Get_rank() == 0:
             print(json.dumps({"case": a.case, "mode": a.mode, "name": a.name, "status": rec.get("status"),

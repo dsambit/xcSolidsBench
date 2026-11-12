@@ -12,10 +12,11 @@ WHAT=${1:-sb}       # sb: the r2SCAN-SB SCF test; fit: the E1 omega fit (after s
                     # (PBE scan + short grid, then the four functionals at the selected settings)
 case $WHAT in
   sb)  RUN=$W/runs/xcsb/v4_2026-11-12_r2scan_sb; JOBS=job_r2scan_sb.sh; T=02:00:00; AS=7200; LINE=v4-sb;;
+  sb2) RUN=$W/runs/xcsb/v4_2026-11-12_r2scan_sb; JOBS=job_r2scan_sb.sh; ARG2=R; T=01:30:00; AS=5400; LINE=v4-sb;;
   fit) RUN=$W/runs/xcsb/v4_2026-11-12_fe_omega_fit; JOBS=job_fe_omega_fit.sh; T=01:30:00; AS=5400; LINE=v4-e1;;
   tmo-pg) RUN=$W/runs/xcsb/v4_2026-11-12_tmo_gap; JOBS="job_tmo_gap.sh"; ARG2=P,G; T=04:00:00; AS=14400; LINE=v4-sb;;
   tmo-f)  RUN=$W/runs/xcsb/v4_2026-11-12_tmo_gap; JOBS="job_tmo_gap.sh"; ARG2=F; T=04:00:00; AS=14400; LINE=v4-sb;;
-  *) echo "sb, fit, tmo-pg or tmo-f" >&2; exit 2;;
+  *) echo "sb, sb2, fit, tmo-pg or tmo-f" >&2; exit 2;;
 esac
 mkdir -p "$RUN"
 C=$(git -C $W/xcSolidsBench.git rev-parse main)

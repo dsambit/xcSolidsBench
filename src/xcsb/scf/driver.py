@@ -97,7 +97,8 @@ def run_native(case: Case, input_dft: str, workdir: str, comm, host_functional: 
 
 def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path: str | None = None,
                maxiter: int = settings.MAXITER, chunk: int = CHUNK, post=None, deviations: dict | None = None,
-               npool: int = 1, seeds=None, warm_start: dict | None = None, previous_attempts: list | None = None) -> dict:
+               npool: int = 1, seeds=None, warm_start: dict | None = None, previous_attempts: list | None = None,
+               carrier_beta: float | None = None) -> dict:
     """post: optional diagnostic called on the root with (grid, rho, tau) of the converged density; its dict is stored
     as rec["post"] (e.g. xcsb.studies.fe_payback.attribution).
     seeds: optional ripple-seeded restarts after convergence (xcsb.studies.m1_ladder.SeedPlan): each seed overwrites QE's
@@ -134,6 +135,15 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
         comm.Barrier()
         if warm_start.get("mode") not in ("wavefunctions", "files"):
             raise ValueError(f"warm start mode {warm_start.get('mode')!r}: 'wavefunctions' or 'files'")
+        if warm_start["mode"] == "wavefunctions":
+            # the orbitals read are the source's: the band count must be the source's (QE's default nbnd depends on
+            # tot_magnetization; found 2026-11-12: m = 1.0 has 13 bands, m = 0.6 12); recorded as a deviation
+            import dataclasses
+            nb = len(src_rec["eigenvalues_ry"])
+            if case.nbnd != nb:
+                deviations = dict(deviations or {}, nbnd={"case": case.nbnd, "used": nb,
+                                                          "reason": "the warm-start source's band count"})
+                case = dataclasses.replace(case, nbnd=nb)
         warm = {"label": warm_start["label"], "mode": warm_start["mode"], "from": os.path.abspath(warm_start["from"]),
                 "source": {"etot_ry": src_rec["energies_ry"]["etot"], "magnetization": src_rec["magnetization"],
                            "case": src_rec["case"], "xcsb_commit": src_rec["provenance"].get("xcsb_commit")}}
@@ -144,9 +154,10 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
     if warm is None:
         carrier = {"history": []}
         tc = time.time()
+        beta_c = case.mixing_beta if carrier_beta is None else carrier_beta     # a recorded deviation when set (the start only)
         for it in range(1, maxiter + 1):
             s.driver.diagonalize()
-            s.driver.mix(mix_coef=case.mixing_beta)
+            s.driver.mix(mix_coef=beta_c)
             dr2 = float(s.driver.get_scf_error())
             conv = bool(s.driver.qepy_modules.control_flags.get_conv_elec())
             carrier["history"].append({"iter": it, "dr2": dr2, **s.magnetization()})
@@ -154,7 +165,7 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
                 break
         else:
             raise SCFError(f"start: the carrier {settings.CARRIER_DFT} did not converge in {maxiter} iterations")
-        carrier.update(iterations=it, magnetization=s.magnetization(), seconds=time.time() - tc)
+        carrier.update(iterations=it, magnetization=s.magnetization(), seconds=time.time() - tc, mixing_beta=beta_c)
         # QEpy marks an exttype-0 run as finished at convergence (rho is then the output density); the hook continues it
         s.driver.embed.finish = False
         start = f"converged {settings.CARRIER_DFT} (QE native, exttype 0) in the same session, then the hook"

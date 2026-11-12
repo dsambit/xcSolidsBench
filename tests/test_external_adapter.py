@@ -57,4 +57,7 @@ def test_sb_cases():
     assert abs(a - 3.507) < 1e-12 and c.kmesh == (8, 8, 8) and c.degauss == 0.02 and c.ecutwfc == 80.0
     f = S.get_case("SB-Fe-fsm-2.4")
     assert f.tot_magnetization == 2.4 and abs(np.linalg.norm(f.structure.lattice[0]) * 2 / np.sqrt(3) / S.BOHR_PER_ANGSTROM - 2.858) < 1e-12
-    assert len(S.tasks("/r")) == 2 * 4 + 3 * 4
+    t = S.tasks("/r")
+    assert len([x for x in t if x["stage"] == "S"]) == 2 * 4 + 3 * 4 and len([x for x in t if x["stage"] == "R"]) == 4 + 6
+    rr = [x for x in t if x["stage"] == "R"]
+    assert S.command("/r", rr[0])[-4:] == ["--tag", "cb0.1", "--carrier-beta", "0.1"] and "--sb-diag" in S.command("/r", rr[-1])

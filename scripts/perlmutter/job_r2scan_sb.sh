@@ -2,14 +2,14 @@
 # Self-consistent spin-balanced r2SCAN (xcsb.studies.r2scan_sb; strongxc-v4 line, xchole line v4-sb). One 1-node allocation:
 # phase 0 = the energy-vs-potential FD check of r2SCAN-SB and r2SCAN-SB-kin (tests/test_external_fd.py; a failure STOPS the job),
 # then PBE, r2SCAN, r2SCAN-SB, r2SCAN-SB-kin on bcc Fe and fcc Ni (free moment) and Fe at m = 2.2, 2.4, 2.6 (4 lanes), then the table.
-#   bash scripts/perlmutter/job_r2scan_sb.sh <run dir>
+#   bash scripts/perlmutter/job_r2scan_sb.sh <run dir> [S | R]   (R: the Ni rerun with carrier beta 0.1 and the Fe omega runs)
 set -uo pipefail
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 source "$REPO/scripts/perlmutter/env_xcsb.sh"
 source "$REPO/scripts/perlmutter/env_xcsb_v4.sh"
 export XCSB_XCHOLE_SRC=$W/src/xchole-v4-sb/src XCSB_XCHOLE_LINE=v4-sb
 export PYTHONPATH="$REPO/src${PYTHONPATH:+:$PYTHONPATH}"
-RUN=${1:?run dir}
+RUN=${1:?run dir}; STAGES=${2:-S}
 mkdir -p "$RUN"
 cd "$REPO"
 JOB=${SLURM_JOB_ID:-nojob}
@@ -27,7 +27,7 @@ if [ ! -f "$RUN/phase0_PASS" ]; then
   if [ $rc -ne 0 ] || grep -q "skipped" "$RUN/phase0_fd.log"; then echo "STOP: phase 0 (FD potential check) failed rc=$rc" >> "$SUM"; exit 0; fi
   touch "$RUN/phase0_PASS"
 fi
-python -m xcsb.campaign --study r2scan_sb --run "$RUN" --deadline "$DEADLINE" --slots 4 --stages S >> "$RUN/campaign_$JOB.out" 2>&1
+python -m xcsb.campaign --study r2scan_sb --run "$RUN" --deadline "$DEADLINE" --slots 4 --stages "$STAGES" >> "$RUN/campaign_$JOB.out" 2>&1
 echo "campaign rc=$? $(date -Is)" >> "$SUM"
 python -c "
 import json

@@ -40,17 +40,27 @@ def get_case(name) -> Case:
     return Case(s, **kw)
 
 
+NI_CARRIER_BETA = 0.1          # stage R: Ni rerun with the carrier (start) phase at beta 0.1 (a recorded deviation; job 61167271:
+                               # QE's native TPSS carrier diverged from the random start at beta 0.3 in every Ni run)
+OMEGA_DIAG = (0.0, 10.0, 30.0)  # stage R: r2SCAN-SB gate-width diagnostics on free Fe (omega 0 = the lam = 1 ceiling)
+
+
 def tasks(run):
-    t = [{"id": f"SB-{el}__{f}", "case": f"SB-{el}", "functional": f, "width": 1, "stage": "S", "est_s": 1200.0}
+    t = [{"id": f"SB-{el}__{f}", "case": f"SB-{el}", "functional": f, "width": 1, "stage": "S", "est_s": 1200.0, "tag": ""}
          for el in A_STATIC for f in FUNCTIONALS]
     t += [{"id": f"SB-Fe-fsm-{m:.1f}__{f}", "case": f"SB-Fe-fsm-{m:.1f}", "functional": f, "width": 1, "stage": "S",
-           "est_s": 1200.0} for m in FSM_M for f in FUNCTIONALS]
+           "est_s": 1200.0, "tag": ""} for m in FSM_M for f in FUNCTIONALS]
+    t += [{"id": f"SB-Ni__{f}__cb{NI_CARRIER_BETA:g}", "case": "SB-Ni", "functional": f, "width": 1, "stage": "R", "est_s": 1500.0,
+           "tag": f"cb{NI_CARRIER_BETA:g}", "carrier_beta": NI_CARRIER_BETA} for f in FUNCTIONALS]
+    t += [{"id": f"SB-Fe__{base}(omega={w:g})", "case": "SB-Fe", "functional": f"{base}(omega={w:g})", "width": 1, "stage": "R",
+           "est_s": 1200.0, "tag": ""} for w in OMEGA_DIAG for base in ("r2SCAN-SB", "r2SCAN-SB-kin")]
     return t
 
 
 def record(run, task):
     from ..tiers import run_dir
-    p = os.path.join(run_dir(run, task["case"], "hooked", task["functional"]), "record.json")
+    p = os.path.join(run_dir(run, task["case"], "hooked", task["functional"]) + (f"__{task['tag']}" if task.get("tag") else ""),
+                     "record.json")
     return json.load(open(p)) if os.path.exists(p) else None
 
 
@@ -65,7 +75,14 @@ def failed(run, task):
 
 
 def command(run, task):
-    return ["scf", "--case", task["case"], "--mode", "hooked", "--name", task["functional"], "--root", run]
+    a = ["scf", "--case", task["case"], "--mode", "hooked", "--name", task["functional"], "--root", run]
+    if task["functional"].startswith("r2SCAN-SB"):
+        a.append("--sb-diag")
+    if task.get("tag"):
+        a += ["--tag", task["tag"]]
+    if task.get("carrier_beta") is not None:
+        a += ["--carrier-beta", f"{task['carrier_beta']:g}"]
+    return a
 
 
 def table(run):
@@ -76,6 +93,9 @@ def table(run):
     for el in A_STATIC:
         for f in FUNCTIONALS:
             r = record(run, {"case": f"SB-{el}", "functional": f})
+            if el == "Ni":                                  # the stage-R rerun (carrier beta 0.1) replaces the aborted runs
+                r2 = record(run, {"case": "SB-Ni", "functional": f, "tag": f"cb{NI_CARRIER_BETA:g}"})
+                r = r2 if r2 is not None else r
             out["free"][f"{el}|{f}"] = (None if r is None else
                                         {"status": r.get("status"), "m": (r.get("magnetization") or {}).get("total"),
                                          "abs_m": (r.get("magnetization") or {}).get("absolute"),
@@ -89,6 +109,14 @@ def table(run):
         e0 = rows.get(f"{FSM_M[0]:.1f}")
         out["fsm_Fe"][f] = {"etot_ry": rows, "E_minus_E2.2_meV": {k: None if v is None or e0 is None else (v - e0) * RYMEV
                                                                   for k, v in rows.items()}}
+    out["omega_diag_Fe"] = {}
+    for w in OMEGA_DIAG + (90.0,):
+        for base in ("r2SCAN-SB", "r2SCAN-SB-kin"):
+            f = base if w == 90.0 else f"{base}(omega={w:g})"
+            r = record(run, {"case": "SB-Fe", "functional": f})
+            out["omega_diag_Fe"][f] = None if r is None else {
+                "status": r.get("status"), "m": (r.get("magnetization") or {}).get("total"),
+                "abs_m": (r.get("magnetization") or {}).get("absolute"), "sb": (r.get("post") or {}).get("sb")}
     pbe = {el: (out["free"].get(f"{el}|PBE") or {}).get("m") for el in A_STATIC}
     out["m_minus_PBE"] = {k: (None if v is None or v.get("m") is None or pbe[k.split("|")[0]] is None
                               else abs(v["m"]) - abs(pbe[k.split("|")[0]])) for k, v in out["free"].items()}
