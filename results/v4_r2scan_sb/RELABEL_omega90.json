@@ -1,0 +1,91 @@
+{
+ "decision": "user 2026-11-12: r2SCAN-SB / -kin without an explicit omega mean omega 10 (external.DEFAULT_OMEGA)",
+ "run_dirs": [
+  {
+   "from": "SB-Fe-fsm-2.2__hooked__r2SCAN-SB",
+   "to": "SB-Fe-fsm-2.2__hooked__r2SCAN-SB(omega90)",
+   "status": "ok",
+   "provenance_omega": 90.0
+  },
+  {
+   "from": "SB-Fe-fsm-2.2__hooked__r2SCAN-SB-kin",
+   "to": "SB-Fe-fsm-2.2__hooked__r2SCAN-SB-kin(omega90)",
+   "status": "ok",
+   "provenance_omega": 90.0
+  },
+  {
+   "from": "SB-Fe-fsm-2.4__hooked__r2SCAN-SB",
+   "to": "SB-Fe-fsm-2.4__hooked__r2SCAN-SB(omega90)",
+   "status": "ok",
+   "provenance_omega": 90.0
+  },
+  {
+   "from": "SB-Fe-fsm-2.4__hooked__r2SCAN-SB-kin",
+   "to": "SB-Fe-fsm-2.4__hooked__r2SCAN-SB-kin(omega90)",
+   "status": "ok",
+   "provenance_omega": 90.0
+  },
+  {
+   "from": "SB-Fe-fsm-2.6__hooked__r2SCAN-SB",
+   "to": "SB-Fe-fsm-2.6__hooked__r2SCAN-SB(omega90)",
+   "status": "ok",
+   "provenance_omega": 90.0
+  },
+  {
+   "from": "SB-Fe-fsm-2.6__hooked__r2SCAN-SB-kin",
+   "to": "SB-Fe-fsm-2.6__hooked__r2SCAN-SB-kin(omega90)",
+   "status": "ok",
+   "provenance_omega": 90.0
+  },
+  {
+   "from": "SB-Fe__hooked__r2SCAN-SB",
+   "to": "SB-Fe__hooked__r2SCAN-SB(omega90)",
+   "status": "ok",
+   "provenance_omega": 90.0
+  },
+  {
+   "from": "SB-Fe__hooked__r2SCAN-SB-kin",
+   "to": "SB-Fe__hooked__r2SCAN-SB-kin(omega90)",
+   "status": "ok",
+   "provenance_omega": 90.0
+  },
+  {
+   "from": "SB-Ni__hooked__r2SCAN-SB",
+   "to": "SB-Ni__hooked__r2SCAN-SB(omega90)",
+   "status": null,
+   "provenance_omega": null
+  },
+  {
+   "from": "SB-Ni__hooked__r2SCAN-SB-kin",
+   "to": "SB-Ni__hooked__r2SCAN-SB-kin(omega90)",
+   "status": null,
+   "provenance_omega": null
+  },
+  {
+   "from": "SB-Ni__hooked__r2SCAN-SB-kin__cb0.1",
+   "to": "SB-Ni__hooked__r2SCAN-SB-kin(omega90)__cb0.1",
+   "status": "ok",
+   "provenance_omega": 90.0
+  },
+  {
+   "from": "SB-Ni__hooked__r2SCAN-SB__cb0.1",
+   "to": "SB-Ni__hooked__r2SCAN-SB(omega90)__cb0.1",
+   "status": "ok",
+   "provenance_omega": 90.0
+  }
+ ],
+ "claims_moved": [
+  "SB-Fe-fsm-2.2__r2SCAN-SB",
+  "SB-Fe-fsm-2.2__r2SCAN-SB-kin",
+  "SB-Fe-fsm-2.4__r2SCAN-SB",
+  "SB-Fe-fsm-2.4__r2SCAN-SB-kin",
+  "SB-Fe-fsm-2.6__r2SCAN-SB",
+  "SB-Fe-fsm-2.6__r2SCAN-SB-kin",
+  "SB-Fe__r2SCAN-SB",
+  "SB-Fe__r2SCAN-SB-kin",
+  "SB-Ni__r2SCAN-SB",
+  "SB-Ni__r2SCAN-SB-kin",
+  "SB-Ni__r2SCAN-SB-kin__cb0.1",
+  "SB-Ni__r2SCAN-SB__cb0.1"
+ ]
+}
