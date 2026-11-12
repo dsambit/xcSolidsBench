@@ -97,7 +97,7 @@ def get_case(name):
 
 def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None = None, payback_diag: bool = False,
         maxiter: int | None = None, mixing_beta: float | None = None, mag_split: bool = False, fsm_parts: bool = False,
-        npool: int = 1, ripple: str | None = None, m1_diag: bool = False, warm_from: str | None = None,
+        npool: int = 1, ripple: str | None = None, m1_diag: bool = False, e1_diag: bool = False, warm_from: str | None = None,
         warm_label: str | None = None, warm_mode: str | None = None):
     """mode 'native': QE's input_dft = name (host_check: a libxc name for the host E_xc of the native density);
     mode 'hooked': the functional `name` through the hooks. Writes <out>/record.json."""
@@ -136,6 +136,9 @@ def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None =
             if m1_diag:
                 from .studies.m1_ladder import post_diag
                 posts.append(("m1", post_diag))
+            if e1_diag:
+                from .studies.fe_sb_frozen import e1_parts
+                posts.append(("e1", lambda g, r, t: e1_parts(name, g, r, t)))
             seeds = None
             if ripple:
                 from .studies.m1_ladder import SeedPlan

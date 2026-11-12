@@ -5,9 +5,9 @@ First use (user 2026-11-11): the Perdew-group spin-balanced r2SCAN as implemente
 sb_r2scan.py), names 'r2SCAN-SB' (R0 half split, the primary) and 'r2SCAN-SB-kin'. xchole is pinned through the line
 'v4-sb' (functional.xchole.XCHOLE_PINS); the module file's sha256 goes into the provenance.
 
-The interface this adapter requires of the external module (EXTERNAL[name] = (path relative to the xchole root, function)):
+The interface used (strongxc-v4 b2501727c sb_r2scan.py; EXTERNAL[name] = (path relative to the xchole root, function)):
 
-    evaluate_points(name, rho, grad, tau) -> dict(e=(N,), d_rho=(2, N), d_grad=(2, 3, N), d_tau=(2, N))
+    evaluate_arrays(rho, grad, tau, r0_form=NAMES[name], omega=OMEGA) -> dict(e=(N,), d_rho=(2, N), d_grad=(2, 3, N), d_tau=(2, N), parts)
 
 Hartree atomic units; rho (2, N) per spin; grad (2, 3, N) the vectors grad rho_s; tau (2, N) = (1/2) sum_i |grad phi_i,s|^2;
 e the XC energy per volume; d_* the exact per-point partial derivatives of e. Zero-density points (the padding of the last
@@ -22,8 +22,8 @@ import numpy as np
 
 from .contract import PointFunctional, PointInputs, PointOutputs
 
-EXTERNAL = {"r2SCAN-SB": ("explore/spin_balance/sb_r2scan.py", "evaluate_points"),
-            "r2SCAN-SB-kin": ("explore/spin_balance/sb_r2scan.py", "evaluate_points")}
+EXTERNAL = {"r2SCAN-SB": ("explore/spin_balance/sb_r2scan.py", "evaluate_arrays"),
+            "r2SCAN-SB-kin": ("explore/spin_balance/sb_r2scan.py", "evaluate_arrays")}
 LINE = {"r2SCAN-SB": "v4-sb", "r2SCAN-SB-kin": "v4-sb"}
 
 
@@ -47,10 +47,12 @@ class ExternalFunctional(PointFunctional):
         spec = importlib.util.spec_from_file_location(f"xcsb_external_{os.path.basename(path)[:-3]}", path)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
-        self.name, self._f = name, getattr(mod, fn)
+        r0_form, omega = mod.NAMES[name], float(mod.OMEGA)
+        fun = getattr(mod, fn)
+        self.name = name
+        self._f = lambda nm, rho, grad, tau: fun(rho, grad, tau, r0_form=r0_form, omega=omega)
         self._prov = {"name": name, "kind": "external", "xchole_commit": commit, "module": rel, "function": fn,
-                      "module_sha256": hashlib.sha256(open(path, "rb").read()).hexdigest(),
-                      "module_provenance": getattr(mod, "PROVENANCE", None)}
+                      "r0_form": r0_form, "omega": omega, "module_sha256": hashlib.sha256(open(path, "rb").read()).hexdigest()}
 
     @property
     def provenance(self) -> dict:

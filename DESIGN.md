@@ -628,6 +628,17 @@ records (sha256 checked), plus explore/spin_balance (the E1 reference function).
   solids/lattice_constants_static_ni_2026-11-11); Fe also at m = 2.2, 2.4, 2.6. hcp Co: not in the Zhang et al. tables (open:
   a sourced static Co lattice and c/a). The 80 Ry cutoff is the Fe setting; the ladder has not covered Ni. PBE and r2SCAN are
   computed once at this protocol and banked (the earlier Fe80 runs used a = 2.866 Å).
+  Landed 2026-11-11 at strongxc-v4 b2501727c (pin line v4-sb; model sources and records identical to v3.1): the adapter calls
+  sb_r2scan.evaluate_arrays(rho, grad, tau, r0_form, omega = 90); FD-checked through the adapter on the laptop (both names,
+  polarized and unpolarized) and again in phase 0 on the node.
+- Item 4, the E1 ω fit (user decision 2026-11-11, strongxc-v4 rules exception 92b1cfb56; `xcsb.studies.fe_omega_fit`,
+  `job_fe_omega_fit.sh`, run dir `$W/runs/xcsb/v4_2026-11-12_fe_omega_fit`): per set, SCH-SI-X:v3.1 + E1 (UEG reference, base
+  placement, R0 kin; sb_model.install, exact JAX derivatives, FD-checked in phase 0) self-consistently on bcc Fe at the SB-Fe
+  settings (static 2.858 Å, 80/320 Ry, 8³ k, Gaussian 0.02, FM start, cold carrier start); target = our PBE moment at THESE
+  settings (the r2SCAN-SB job's PBE Fe record; the FSM free PBE 2.381 μB was at 2.866 Å). Bracket from the frozen ω scan; 3 SC
+  points (bracket ends and geometric mean); ω* by interpolation in log ω; the H-atom check of the term at ω* (|ΔE| ≤ 1e-6 Ha);
+  a confirming SC run at ω* with the E1 parts. STOP rules: no bracket, a bracket below ω 10, m(ω) not monotone or not reaching
+  the target, the H check failing. Co and Ni stay hold-outs.
 
 ## 7. Verification tiers
 

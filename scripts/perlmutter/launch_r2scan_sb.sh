@@ -1,11 +1,18 @@
 #!/bin/bash
-# Launch ONE 1-node interactive allocation (2 h, m2360) of the self-consistent spin-balanced r2SCAN test; self-terminating.
+# Launch ONE 1-node interactive allocation (m2360) of the self-consistent spin-balanced r2SCAN test ('sb', 2 h) or of the E1
+# omega fit to our PBE Fe moment ('fit', 1.5 h; after 'sb' and the frozen job); self-terminating.
 # Needs the xchole clone $W/src/xchole-v4sb at the spin-balance agent's commit (the pin XCHOLE_PINS['v4-sb'] of this commit).
-# Login node:  nohup bash <any clone>/scripts/perlmutter/launch_r2scan_sb.sh > $W/runs/xcsb/v4_2026-11-12_r2scan_sb/launch_1.log 2>&1 &
+# Login node:  nohup bash <any clone>/scripts/perlmutter/launch_r2scan_sb.sh sb  > $W/runs/xcsb/v4_2026-11-12_r2scan_sb/launch_1.log 2>&1 &
+#              nohup bash <any clone>/scripts/perlmutter/launch_r2scan_sb.sh fit > $W/runs/xcsb/v4_2026-11-12_fe_omega_fit/launch_1.log 2>&1 &
 # Refuses to start while the user has >= 2 jobs queued or running (all workstreams); salloc retried (12 x 5 min) only when an
 # interactive request is revoked while pending.
 W=/pscratch/sd/d/dsambit/xc_functional_dev
-RUN=$W/runs/xcsb/v4_2026-11-12_r2scan_sb
+WHAT=${1:-sb}                                    # sb: the r2SCAN-SB SCF test; fit: the E1 omega fit (after sb and the frozen job)
+case $WHAT in
+  sb)  RUN=$W/runs/xcsb/v4_2026-11-12_r2scan_sb; JOBS=job_r2scan_sb.sh; T=02:00:00; AS=7200;;
+  fit) RUN=$W/runs/xcsb/v4_2026-11-12_fe_omega_fit; JOBS=job_fe_omega_fit.sh; T=01:30:00; AS=5400;;
+  *) echo "sb or fit" >&2; exit 2;;
+esac
 mkdir -p "$RUN"
 C=$(git -C $W/xcSolidsBench.git rev-parse main)
 REPO=$W/src/xcSolidsBench-sb-${C:0:8}
@@ -24,8 +31,8 @@ for try in $(seq 1 12); do
     exit 1
   fi
   out="$RUN/job_$(date +%Y%m%dT%H%M%S)_try$try.out"
-  XCSB_ALLOC_S=7200 salloc -N 1 -C cpu -q interactive -t 02:00:00 -A m2360 --job-name xcsb_r2sb \
-    bash -c "cd $REPO && bash scripts/perlmutter/job_r2scan_sb.sh $RUN" > "$out" 2>&1
+  XCSB_ALLOC_S=$AS salloc -N 1 -C cpu -q interactive -t $T -A m2360 --job-name xcsb_v4$WHAT \
+    bash -c "cd $REPO && bash scripts/perlmutter/$JOBS $RUN" > "$out" 2>&1
   echo "try $try exit $? $(date -Is) ($out)" >> "$RUN/launch_tries.txt"
   grep -q "Unable to allocate resources" "$out" || break
   sleep 300

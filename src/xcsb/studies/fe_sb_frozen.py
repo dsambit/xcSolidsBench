@@ -275,3 +275,45 @@ def main(argv=None):
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def e1_parts(functional_name, grid, rho, tau):
+    """Post diagnostic of an SCF run with the E1 term ('SCH-SI-X:v3.1+E1@omega=w'): on its converged density, E_x, E_c^SI, the
+    term Delta E (Ry) and the gate diagnostics overall and in the 3d region (sb_model.e_xc_points at the run's omega)."""
+    from ..functional.xchole import parse_e1
+    from ..host.evaluate import point_inputs
+    base, w = parse_e1(functional_name)
+    SB, _, _ = sb_module_any()
+    x, _ = point_inputs(grid, rho, tau, True, True)
+    N = grid.npts
+    r3d = _region(grid)
+    n = x.rho.sum(0)
+    acc, acc3 = SB.GateAccumulator(), SB.GateAccumulator()
+    ex = ec = de = 0.0
+    b = "A" if "-A:" in base else "B"
+    for c0 in range(0, N, CHUNK):
+        sl = slice(c0, min(N, c0 + CHUNK))
+        args = [x.rho[0][sl], x.rho[1][sl], x.grad[0][:, sl], x.grad[1][:, sl], x.tau[0][sl], x.tau[1][sl], x.lapl[0][sl],
+                x.lapl[1][sl], x.hess[0][:, sl], x.hess[1][:, sl]]
+        o = SB.e_xc_points(*args, base=b, ref="ueg_end", omega=w, placement="base", indicators=True, r0_form="kin")
+        ww = np.full(sl.stop - sl.start, grid.weight)
+        ex += float(ww @ o["e_x"])
+        ec += float(ww @ o["e_c_si"])
+        de += float(ww @ o["de"])
+        acc.add(o, ww, n[sl])
+        acc3.add(o, ww, n[sl], mask=(r3d[sl] <= R_3D))
+    return {"omega": w, "E_x_ry": RY * ex, "E_c_si_ry": RY * ec, "delta_E_ry": RY * de, "E_xc_ry": RY * (ex + ec + de),
+            "gate_all": acc.summary(), "gate_3d": acc3.summary()}
+
+
+def sb_module_any():
+    """sb_model from the pinned tree of the v4 or v4-sb line."""
+    from ..functional.xchole import XCHOLE_LINE, import_pinned_xchole
+    if XCHOLE_LINE not in ("v4", "v4-sb"):
+        raise RuntimeError("sb_model needs XCSB_XCHOLE_LINE v4 or v4-sb")
+    _, commit = import_pinned_xchole()
+    root = os.path.dirname(os.path.abspath(os.environ["XCSB_XCHOLE_SRC"]))
+    if os.path.join(root, "explore", "spin_balance") not in sys.path:
+        sys.path.insert(0, os.path.join(root, "explore", "spin_balance"))
+    import sb_model
+    return sb_model, commit, root

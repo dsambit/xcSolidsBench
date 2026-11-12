@@ -29,9 +29,11 @@ XCHOLE_PINS = {                                              # line -> pinned xc
     # strongxc-v4 dd8b5a517 (user 2026-11-11, the v4 Fe items): the same sets (src/xchole/sch_si, core, ueg_gauge, benchmarks and
     # explore/xc_pairing identical to 0e9e8ee28, records byte-identical) plus explore/spin_balance (the E1 reference function)
     "v4": "dd8b5a517b45740cbbd409fb92a187eb1cd68e43",
-    # strongxc-v4 with explore/spin_balance/sb_r2scan.py (the Perdew-group spin-balanced r2SCAN, xcsb.functional.external):
-    # NOT SET until the spin-balance agent reports its commit (then: model sources and records checked identical, set here)
-    "v4-sb": None,
+    # strongxc-v4 b2501727c (the spin-balance agent, 2026-11-11): explore/spin_balance/sb_r2scan.py (the Perdew-group
+    # spin-balanced r2SCAN, xcsb.functional.external); src/xchole/sch_si, core, ueg_gauge, benchmarks identical to 0e9e8ee28,
+    # explore/xc_pairing differs only in a path of the unused driver xp_eval.py, sb_model.py identical to dd8b5a517, records
+    # byte-identical
+    "v4-sb": "b2501727cb47e464164a8a722235922be0a1bf2b",
 }
 XCHOLE_LINE = os.environ.get("XCSB_XCHOLE_LINE", "v3.1")
 if XCHOLE_LINE not in XCHOLE_PINS:
@@ -258,3 +260,40 @@ class XcholeFunctional(PointFunctional):
         """(sum e_x, sum e_c) over the points (reporting only)."""
         ex, ec = self._model.e_parts(np.ones(x.n), *self._args(x))
         return float(ex), float(ec)
+
+
+E1_SPEC = {"ref": "ueg_end", "placement": "base", "r0_form": "kin"}      # E1 as defined (strongxc-v4 working formulation)
+
+
+def parse_e1(name: str):
+    """'SCH-SI-A:v3.1+E1@omega=30' -> ('SCH-SI-A:v3.1', 30.0)."""
+    base, rest = name.split("+E1")
+    if not rest.startswith("@omega="):
+        raise KeyError(f"{name!r}: expected '<set>+E1@omega=<value>'")
+    w = float(rest[len("@omega="):])
+    if not w > 0:
+        raise ValueError(f"{name}: omega must be > 0 (omega = 0 is excluded: it loses the one-electron limit)")
+    return base, w
+
+
+class XcholeE1(XcholeFunctional):
+    """A v3.1 set with the v4 spin-balance correlation term E1 (UEG-gauge reference, base placement, R0 kin) at gate width omega:
+    strongxc-v4 explore/spin_balance/sb_model.install wraps jax_si.exc_si in THIS process before the model is built, so the
+    model's jitted energy and exact JAX derivatives carry the term (one SCF per process). Lines v4 and v4-sb (sb_model present)."""
+
+    def __init__(self, name: str):
+        base, w = parse_e1(name)
+        if XCHOLE_LINE not in ("v4", "v4-sb"):
+            raise RuntimeError(f"{name}: needs the xchole line v4 or v4-sb (sb_model), now {XCHOLE_LINE}")
+        import_pinned_xchole()
+        root = os.path.dirname(os.path.abspath(os.environ["XCSB_XCHOLE_SRC"]))
+        sys.path.insert(0, os.path.join(root, "explore", "spin_balance"))
+        import sb_model
+        if getattr(sb_model, "_XCSB_INSTALLED", None) not in (None, (w,)):
+            raise RuntimeError(f"E1 already installed in this process with {sb_model._XCSB_INSTALLED} (one SCF per process)")
+        sb_model.install(E1_SPEC["ref"], w, E1_SPEC["placement"], E1_SPEC["r0_form"])
+        sb_model._XCSB_INSTALLED = (w,)
+        super().__init__(base)
+        self.name = name
+        self._prov.update(kind="xchole + E1 (v4 spin balance)", e1=dict(E1_SPEC, omega=w, module="explore/spin_balance/sb_model.py",
+                          module_sha256=hashlib.sha256(open(sb_model.__file__, "rb").read()).hexdigest()), published_set=False)
