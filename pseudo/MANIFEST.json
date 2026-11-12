@@ -85,6 +85,11 @@
    "sha256": "005153e25136fbb57f010125fd926aa70f92fbf0965d441de63edd16cc5f3053",
    "z_valence": 10.0
   },
+  "Mn": {
+   "file": "Mn_ONCV_PBE-1.2.upf",
+   "sha256": "2a51b829a1c9ea35d8e540c04558242fef30ce4d998ac3c17051d183ec9c35fa",
+   "z_valence": 15.0
+  },
   "Na": {
    "file": "Na_ONCV_PBE-1.2.upf",
    "sha256": "5c74594bad5d585c979c12a14c68cc799bd27f2d425f0b6d29aeab427a83f47b",

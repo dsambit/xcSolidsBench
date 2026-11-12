@@ -80,6 +80,9 @@ def all_cases():
 def get_case(name):
     """A named case; 'Fe80-fsm-<m>': bcc Fe at 80 Ry with the total magnetization fixed to m (mu_B per cell); 'M1-...': the
     M1 ladder cases (xcsb.studies.m1_ladder.parse_case)."""
+    if name.startswith("TMO-"):
+        from .studies.tmo_gap import get_case as tmo_case
+        return tmo_case(name)
     if name.startswith("SB-"):
         from .studies.r2scan_sb import get_case as sb_case
         return sb_case(name)
@@ -97,7 +100,8 @@ def get_case(name):
 
 def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None = None, payback_diag: bool = False,
         maxiter: int | None = None, mixing_beta: float | None = None, mag_split: bool = False, fsm_parts: bool = False,
-        npool: int = 1, ripple: str | None = None, m1_diag: bool = False, e1_diag: bool = False, warm_from: str | None = None,
+        npool: int = 1, ripple: str | None = None, m1_diag: bool = False, e1_diag: bool = False, tmo_diag: bool = False,
+        warm_from: str | None = None,
         warm_label: str | None = None, warm_mode: str | None = None):
     """mode 'native': QE's input_dft = name (host_check: a libxc name for the host E_xc of the native density);
     mode 'hooked': the functional `name` through the hooks. Writes <out>/record.json."""
@@ -136,6 +140,9 @@ def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None =
             if m1_diag:
                 from .studies.m1_ladder import post_diag
                 posts.append(("m1", post_diag))
+            if tmo_diag:
+                from .studies.tmo_gap import post_moments
+                posts.append(("tmo", post_moments(case_name)))
             if e1_diag:
                 from .studies.fe_sb_frozen import e1_parts
                 posts.append(("e1", lambda g, r, t: e1_parts(name, g, r, t)))

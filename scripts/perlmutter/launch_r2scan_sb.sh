@@ -8,11 +8,14 @@
 # Refuses to start while the user has >= 2 jobs queued or running (all workstreams); salloc retried (12 x 5 min) only when an
 # interactive request is revoked while pending.
 W=/pscratch/sd/d/dsambit/xc_functional_dev
-WHAT=${1:-sb}                                    # sb: the r2SCAN-SB SCF test; fit: the E1 omega fit (after sb and the frozen job)
+WHAT=${1:-sb}       # sb: the r2SCAN-SB SCF test; fit: the E1 omega fit (after sb and the frozen job); tmo-pg / tmo-f: NiO, MnO gaps
+                    # (PBE scan + short grid, then the four functionals at the selected settings)
 case $WHAT in
   sb)  RUN=$W/runs/xcsb/v4_2026-11-12_r2scan_sb; JOBS=job_r2scan_sb.sh; T=02:00:00; AS=7200; LINE=v4-sb;;
   fit) RUN=$W/runs/xcsb/v4_2026-11-12_fe_omega_fit; JOBS=job_fe_omega_fit.sh; T=01:30:00; AS=5400; LINE=v4-e1;;
-  *) echo "sb or fit" >&2; exit 2;;
+  tmo-pg) RUN=$W/runs/xcsb/v4_2026-11-12_tmo_gap; JOBS="job_tmo_gap.sh"; ARG2=P,G; T=04:00:00; AS=14400; LINE=v4-sb;;
+  tmo-f)  RUN=$W/runs/xcsb/v4_2026-11-12_tmo_gap; JOBS="job_tmo_gap.sh"; ARG2=F; T=04:00:00; AS=14400; LINE=v4-sb;;
+  *) echo "sb, fit, tmo-pg or tmo-f" >&2; exit 2;;
 esac
 mkdir -p "$RUN"
 C=$(git -C $W/xcSolidsBench.git rev-parse main)
@@ -33,7 +36,7 @@ for try in $(seq 1 12); do
   fi
   out="$RUN/job_$(date +%Y%m%dT%H%M%S)_try$try.out"
   XCSB_ALLOC_S=$AS salloc -N 1 -C cpu -q interactive -t $T -A m2360 --job-name xcsb_v4$WHAT \
-    bash -c "cd $REPO && bash scripts/perlmutter/$JOBS $RUN" > "$out" 2>&1
+    bash -c "cd $REPO && bash scripts/perlmutter/$JOBS $RUN ${ARG2:-}" > "$out" 2>&1
   echo "try $try exit $? $(date -Is) ($out)" >> "$RUN/launch_tries.txt"
   grep -q "Unable to allocate resources" "$out" || break
   sleep 300

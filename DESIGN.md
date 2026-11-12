@@ -642,6 +642,20 @@ records (sha256 checked), plus explore/spin_balance (the E1 reference function).
   target (PBE at 2.858 Å from the r2SCAN-SB job) confirmed by the user 2026-11-11. STOP rules: no bracket, a bracket below ω 10, m(ω) not monotone or not reaching
   the target, the H check failing. Co and Ni stay hold-outs.
 
+### 6.11 v4: AFM-II NiO and MnO gaps (user 2026-11-11; staged, BLOCKED on the lattice: `xcsb.studies.tmo_gap`, `job_tmo_gap.sh`)
+
+Reproduction of the Perdew group's statement (private communication) that spin-balanced r2SCAN improves the NiO and MnO gaps:
+the term and its potential vanish at spin-symmetric states, so only magnetic insulators can show it. Rock-salt parent in the
+rhombohedral 4-atom AFM-II cell (rhombohedral distortion ignored), nspin 2 with ±0.5 starting moments on TM1/TM2, fixed
+occupations with tot_magnetization 0, no U, nbnd = n_occ + 8 with diago_full_acc, SG15 Ni/Mn/O (Mn added to the manifest
+2026-11-11: z 15, no NLCC), plain Broyden β 0.3. PBE scan 60-140 Ry at 4³ k (F4 criteria), then a short PBE grid (r 1, 1.5, 2 at
+4³; k 4³, 6³, 8³ at r = 1), then PBE, r2SCAN, r2SCAN-SB, r2SCAN-SB-kin at the selected settings (xchole line v4-sb). Reported:
+the minimum GKS gap over the mesh with the band-edge k points and spins, the TM site moments (∫(ρ↑ − ρ↓) within 2.0 bohr) and the
+absolute magnetization, iterations. The lattice is missing: the Zhang et al. SM has neither NiO nor MnO, so `A_STATIC` is empty
+and the job stops at once (open item: sourced low-temperature lattice constants and a zero-point estimate). Cost (scaled from
+Fe80, uncertain): about 50 min per SCF at 100 Ry, 4³ k on a quarter node (AFM ~100 iterations), 8³ k on a full node ~1-2 h;
+stage P+G ≈ 2 allocations, stage F ≈ 1-2 allocations of 4 h (batch would fit better).
+
 ## 7. Verification tiers
 
 | tier | what | where | pass |
