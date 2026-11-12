@@ -21,10 +21,19 @@ import numpy as np
 
 from .contract import PointFunctional, PointInputs, PointOutputs
 
-XCHOLE_PIN = "0e9e8ee28338d77f4876b98d2ee082031a4ab5fa"     # strongxc-v3, 2026-11-11 (M1 pin): the v3.1 sets
-#   of 84af4629; against the previous pin f9a275025 (FSM study) src/xchole/sch_si, core, ueg_gauge, benchmarks and
-#   explore/xc_pairing differ only in two docstrings (a note moved to manuscript/), the records are byte-identical (sha256
-#   below); the new commits add the ellipticity ripple diagnostics (xchole.ellipticity, unused here)
+XCHOLE_PINS = {                                              # line -> pinned xchole commit (XCSB_XCHOLE_LINE selects; default v3.1)
+    # strongxc-v3, 2026-11-11 (M1 pin): the v3.1 sets of 84af4629; against the previous pin f9a275025 (FSM study)
+    # src/xchole/sch_si, core, ueg_gauge, benchmarks and explore/xc_pairing differ only in two docstrings (a note moved to
+    # manuscript/), the records are byte-identical (sha256 below); the new commits add xchole.ellipticity (unused here)
+    "v3.1": "0e9e8ee28338d77f4876b98d2ee082031a4ab5fa",
+    # strongxc-v4 dd8b5a517 (user 2026-11-11, the v4 Fe items): the same sets (src/xchole/sch_si, core, ueg_gauge, benchmarks and
+    # explore/xc_pairing identical to 0e9e8ee28, records byte-identical) plus explore/spin_balance (the E1 reference function)
+    "v4": "dd8b5a517b45740cbbd409fb92a187eb1cd68e43",
+}
+XCHOLE_LINE = os.environ.get("XCSB_XCHOLE_LINE", "v3.1")
+if XCHOLE_LINE not in XCHOLE_PINS:
+    raise KeyError(f"XCSB_XCHOLE_LINE {XCHOLE_LINE!r}: one of {sorted(XCHOLE_PINS)}")
+XCHOLE_PIN = XCHOLE_PINS[XCHOLE_LINE]
 RECORD_SHA256 = {                                            # installed records at the pin (src/xchole/sch_si/parameter_sets)
     "SCH-SI-A:v3.1": ("SCH-SI-A-v3.1.json", "cbd4b9c58bda0b15a6857bd463197c5e3c82da6ec2263a4232a09a9e8974280f"),
     "SCH-SI-B:v3.1": ("SCH-SI-B-v3.1.json", "5b9d3a24162b78f8314319b13085d46f2da84e5a983096bfe6c1fd217bbda277"),

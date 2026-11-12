@@ -593,6 +593,29 @@ LC20, F2 and F3 (e.g. Fe, Ni, V, Pd if present) is reused, not recomputed.
 - Cost (Fe 80 Ry timing scaled by cell volume, nspin, irreducible k and (ecutwfc/80)^1.5): ≤ 0.3 h per SCF on a quarter node,
   all 46 SCFs ≈ 0.6-1.0 node-h for E_c 70-110 Ry: one 4 h allocation.
 
+### 6.10 v4 Fe items (user 2026-11-11; strongxc-v4 line: run dirs v4_*, records line = v4, xchole pin strongxc-v4 dd8b5a517)
+
+The v4 line pins xchole to strongxc-v4 dd8b5a517 (`XCSB_XCHOLE_LINE=v4`, `scripts/perlmutter/env_xcsb_v4.sh`): the v3.1 sets with
+model sources (src/xchole/sch_si, core, ueg_gauge, benchmarks, explore/xc_pairing) identical to 0e9e8ee28 and byte-identical
+records (sha256 checked), plus explore/spin_balance (the E1 reference function).
+
+- Item 1, dense FSM scan + hysteresis (`xcsb.studies.fe_fsm_dense`, `job_fe_fsm_dense.sh`, run dir
+  `$W/runs/xcsb/v4_2026-11-12_fe_fsm_dense`): m = 0.6-0.9 cold for A, B, A#ueg-end, PBE; for A and B also warm starts from the
+  converged m = 0.5 and m = 1.0 wavefunctions of the FSM run (Sec. 5, mode 'wavefunctions'). Two branches at m: two converged
+  starts differing by > 1e-4 Ry. Reported per point and start: E, iterations, m-weighted w_x per spin and w_c, piece energies;
+  no orbital (Löwdin) projections: the host has none (QE's projwfc is not in the QEpy session).
+- Item 2, frozen spin balance (`xcsb.studies.fe_sb_frozen`, `job_fe_sb.sh`, run dir `$W/runs/xcsb/v4_2026-11-12_fe_sb`): the
+  converged fields of every FSM grid point are read from the point's QE save (`xcsb.host.qe_files`; checked on PBE/r2SCAN points:
+  E_xc on the saved fields = the record's to 7e-12 Ry, electrons and min ρ identical; the saved LSDA magnetization coefficients
+  are Hermitian to ~1e-7, the real part is used) and checked again per point (electrons per spin 1e-8; Σ w (e_x + e_c^SI) = the
+  record's E_xc to 1e-7 Ry). Variants: E1 as defined (UEG-gauge reference, ω 90, base placement, R0 kin), PBE reference, R0 half,
+  and ω = 0 (λ = 1: the ceiling, a diagnostic only). Per point ΔE; per curve the frozen corrected E(m), implied moment, E″ and E_xc″
+  at m = 0 and at the implied moment; the gate diagnostics (v4's GateAccumulator) overall and in the 3d region (r ≤ 1.3 bohr of
+  the Fe site; diagnostic only). Texture (frozen, no model term): density-weighted distributions (overall, 3d region, per density
+  decade) of ζ, |∇ζ|/(2k_F) and |∇ζ|/(2k_s) (k_s = √(4k_F/π)), c_θ = ∇ζ·∇n/(|∇ζ||∇n|), w_c′, with the He-pair and flat pieces
+  along m. Cross-check first: the reference function on v4's testpoints_sb.json (every stored key; whether it was regenerated
+  with R0 kin for both sets is recorded).
+
 ## 7. Verification tiers
 
 | tier | what | where | pass |

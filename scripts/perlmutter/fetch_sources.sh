@@ -14,4 +14,10 @@ if [ ! -d "$XROOT" ]; then
   git clone -q "$W/xcHoleModelMeta.git" "$XROOT"
   git -C "$XROOT" checkout -q 0e9e8ee28338d77f4876b98d2ee082031a4ab5fa
 fi
+# the v4 line (strongxc-v4 dd8b5a517: the same v3.1 sets plus explore/spin_balance); jobs select it with env_xcsb_v4.sh
+X4=$W/src/xchole-dd8b5a51
+if [ ! -d "$X4" ]; then
+  git clone -q "$W/xcHoleModelMeta.git" "$X4"
+  git -C "$X4" checkout -q dd8b5a517b45740cbbd409fb92a187eb1cd68e43
+fi
 python3 "$REPO/scripts/fetch_pseudos.py" "$XCSB_PSEUDO_DIR" "$REPO/pseudo/MANIFEST.json"

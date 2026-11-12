@@ -36,7 +36,8 @@ def code_provenance():
         dirty = bool(subprocess.check_output(["git", "-C", root, "status", "--porcelain", "--", "."], text=True).strip())
     except (OSError, subprocess.CalledProcessError):
         commit, dirty = None, None
-    prov = {"xcsb": __version__, "xcsb_commit": commit, "xcsb_dirty": dirty, "settings": settings.as_dict()}
+    prov = {"xcsb": __version__, "xcsb_commit": commit, "xcsb_dirty": dirty, "settings": settings.as_dict(),
+            "line": os.environ.get("XCSB_LINE"), "xchole_line": os.environ.get("XCSB_XCHOLE_LINE", "v3.1")}
     info = os.path.join(os.environ.get("XCSB_BUILD", ""), "BUILD_INFO.json")
     if os.path.exists(info):
         prov["build"] = json.load(open(info))
