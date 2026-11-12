@@ -556,6 +556,36 @@ LC20, F2 and F3 (e.g. Fe, Ni, V, Pd if present) is reused, not recomputed.
 
 ---
 
+### 6.9 MgO band gap (user 2026-11-11; staged, `xcsb.studies.mgo_gap`, `scripts/perlmutter/job_mgo_gap.sh`)
+
+- Rock salt, primitive 2-atom cell, a_static = 4.189 Å (Q10 rule: measured 4.207 − PBE zero-point expansion 0.018; Zhang et al.
+  NJP 2018 SM Table III; archive `solids/lattice_constants_static_mgo_2026-11-11`), SG15 Mg, O; nspin 1, fixed occupations
+  (16 electrons, 8 occupied bands), nbnd 12 with `diago_full_acc` (empty bands converged like the occupied ones); PBE, r2SCAN
+  (reference functionals: banked once at this protocol, `xcsb mgo bank`), SCH-SI-A:v3.1, SCH-SI-B:v3.1, through the hooks,
+  cold starts; one QE pool per SCF (the k list, hence the eigenvalues, is then complete).
+- E_c^PBE: PBE scan 40-140 Ry at 8³ k; the smallest cutoff from which every successive pair has |ΔE_tot| ≤ 1 meV/atom (the
+  F2/F3 energy criterion carried over to an insulator, which has no moment) and |Δgap_Γ| ≤ 0.02 eV (the F4 gap criterion).
+- Grid: ecutwfc/E_c^PBE ∈ {1, 1.5, 2} × Γ-centred unshifted k ∈ {6³, 8³, 10³} (Γ, X, L lie on every even mesh), d = 4, all
+  four functionals (36 SCFs), the gap at every point (a cutoff drift of SCH-SI is visible). Selected: the smallest r with
+  |gap_Γ(r) − gap_Γ(r = 2)| ≤ 0.02 eV at 10³ k for all four, and the smallest k with |gap_Γ(k) − gap_Γ(10³)| ≤ 0.02 eV at r = 2;
+  if only the largest value qualifies, the axis is reported as not shown converged.
+- The gap: the GKS eigenvalue gap ε_CBM − ε_VBM of the converged SCF (the τ potential is non-multiplicative). Reported: the
+  direct gaps at Γ, X, L, the minimum gap over the SCF mesh (with its k points), per functional with E_c^PBE, the settings, the
+  iterations and the differences to PBE. Interpretation (Perdew-group research note 2026-11-11, archive literature; private,
+  not for citation): for delocalized carriers in an extended solid and a continuous approximate GKS operator, an approximation's
+  fundamental gap equals its own GKS orbital gap; this does not make it an accurate experimental gap.
+- Experiment: no sourced experimental MgO gap in the archive literature (open item for the user: the fundamental gap, with
+  zero-point renormalization and the exciton caveat).
+- Bands along Γ-X-L (not built): the host has no non-SCF band calculation. It would take (i) the converged ρ_σ, τ_σ saved by
+  the host on the node (npz in the run directory; not QE's files, which changed the density on read-back in M0), (ii) a second
+  QEpy session with an explicit k list along the path and fixed occupations, whose potentials are set once from the saved
+  fields through the existing hooks (extpot, extkin, extene) and then diagonalized without mixing (QEpy's nscf diagonalization,
+  or one diagonalize call per k batch with the density update suppressed), with QE's own v_of_rho kept from overwriting the
+  fixed potential (exttype 4 already switches QE's XC off; the Hartree part must come from the saved density), and (iii) a
+  check that the same procedure on the SCF k list reproduces the SCF eigenvalues to 1e−5 Ry.
+- Cost (Fe 80 Ry timing scaled by cell volume, nspin, irreducible k and (ecutwfc/80)^1.5): ≤ 0.3 h per SCF on a quarter node,
+  all 46 SCFs ≈ 0.6-1.0 node-h for E_c 70-110 Ry: one 4 h allocation.
+
 ## 7. Verification tiers
 
 | tier | what | where | pass |

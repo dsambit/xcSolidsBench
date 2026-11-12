@@ -172,7 +172,7 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
                    fermi_ry=s.fermi_level())
         if npool == 1:
             et, wk = s.eigenvalues()
-            rec.update(eigenvalues_ry=et.tolist(), kweights=wk.tolist())
+            rec.update(eigenvalues_ry=et.tolist(), kweights=wk.tolist(), kpoints_frac=s.kpoints_frac().tolist())
         if rank == 0:
             rec.update(e_xc_final_ry=2 * res.e_xc, density_stats=res.stats)
             if post is not None:                         # a diagnostic: its failure is recorded, the SCF result stands

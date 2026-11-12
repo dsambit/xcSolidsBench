@@ -34,6 +34,7 @@ class Case:
     conv_class: str = "bench"              # "bench" (settings.CONV_THR_BENCH) or "verification" (CONV_THR_VERIFY)
     mixing_beta: float = settings.MIXING_BETA
     nbnd: int | None = None
+    diago_full_acc: bool = False           # converge the empty bands as tightly as the occupied ones (band gaps)
 
     @property
     def conv_thr(self) -> float:
@@ -59,7 +60,7 @@ class Case:
                 "degauss": self.degauss, "nspin": self.nspin, "starting_magnetization": dict(self.starting_magnetization),
                 "tot_magnetization": self.tot_magnetization, "nosym": self.nosym, "conv_thr": self.conv_thr,
                 "conv_class": self.conv_class,
-                "mixing_beta": self.mixing_beta, "nbnd": self.nbnd}
+                "mixing_beta": self.mixing_beta, "nbnd": self.nbnd, "diago_full_acc": self.diago_full_acc}
 
 
 def pw_input(case: Case, input_dft: str, pseudo_dir: str, outdir: str, prefix: str, maxiter: int = settings.MAXITER,
@@ -90,6 +91,7 @@ def pw_input(case: Case, input_dft: str, pseudo_dir: str, outdir: str, prefix: s
              "&ELECTRONS", f"  conv_thr = {case.conv_thr:.3e}", f"  mixing_mode = '{settings.MIXING_MODE}'",
              f"  mixing_beta = {case.mixing_beta:.6f}", f"  mixing_ndim = {settings.MIXING_NDIM}",
              f"  electron_maxstep = {maxiter}",
+             *(["  diago_full_acc = .true."] if case.diago_full_acc else []),
              f"  startingwfc = '{'file' if restart else settings.STARTINGWFC}'",
              f"  startingpot = '{'file' if restart else 'atomic'}'", "/",
              "ATOMIC_SPECIES"]
@@ -222,6 +224,12 @@ class QESession:
             raise RuntimeError("eigenvalues: QE's k list is pool-local; only with npool = 1")
         w = self.driver.qepy_pw.wvfct
         return np.asarray(w.get_array_et()).copy(), np.asarray(self.driver.qepy_pw.klist.get_array_wk()).copy()
+
+    def kpoints_frac(self):
+        """The irreducible k points in crystal coordinates (fractions of the reciprocal vectors), (nks, 3); one pool only."""
+        if self.npool != 1:
+            raise RuntimeError("kpoints_frac: QE's k list is pool-local; only with npool = 1")
+        return np.asarray(self.driver.get_ibz_k_points(), dtype=float).copy()
 
     def fermi_level(self):
         return float(self.driver.get_fermi_level())

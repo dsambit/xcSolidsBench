@@ -80,6 +80,9 @@ def all_cases():
 def get_case(name):
     """A named case; 'Fe80-fsm-<m>': bcc Fe at 80 Ry with the total magnetization fixed to m (mu_B per cell); 'M1-...': the
     M1 ladder cases (xcsb.studies.m1_ladder.parse_case)."""
+    if name.startswith("MgO-"):
+        from .studies.mgo_gap import get_case as mgo_case
+        return mgo_case(name)
     if name.startswith("M1-"):
         from .studies.m1_ladder import get_case as m1_case
         return m1_case(name)

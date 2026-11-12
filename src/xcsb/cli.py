@@ -49,6 +49,9 @@ def main(argv=None):
     m1 = sub.add_parser("m1", help="M1 cutoff ladder: task list, E_c^PBE, tables (serial; no QE)")
     m1.add_argument("what", choices=["tasks", "ec", "table", "report-p"])
     m1.add_argument("--run", required=True)
+    mg = sub.add_parser("mgo", help="MgO band gap: task list, tables, the banked reference record (serial; no QE)")
+    mg.add_argument("what", choices=["tasks", "table", "bank"])
+    mg.add_argument("--run", required=True)
     pv = sub.add_parser("prep-variant", help="re-solve and cache the norms of norm-dependent xchole variants (serial)")
     pv.add_argument("names", nargs="+")
     c = sub.add_parser("compare", help="tier verdicts from the SCF records")
@@ -93,6 +96,18 @@ def main(argv=None):
             json.dump(res, open(os.path.join(a.run, "ladder_table.json"), "w"), indent=1, default=float)
             from .studies.m1_report import render
             print(render(res))
+        return 0
+    if a.cmd == "mgo":
+        from .studies import mgo_gap as G
+        if a.what == "tasks":
+            for t in G.tasks(a.run):
+                print(json.dumps(dict(t, done=G.done(a.run, t), failed=G.failed(a.run, t))))
+        elif a.what == "table":
+            res = G.table(a.run)
+            json.dump(res, open(os.path.join(a.run, "gap_table.json"), "w"), indent=1, default=float)
+            print(G.render(res))
+        else:
+            print(json.dumps(G.bank_reference(a.run), indent=1, default=float))
         return 0
     if a.cmd == "compare":
         from . import tiers
