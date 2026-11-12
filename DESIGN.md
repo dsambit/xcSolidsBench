@@ -657,10 +657,13 @@ records (sha256 checked), plus explore/spin_balance (the E1 reference function).
   Follow-up (job_v4_combo.sh, `xcsb.studies.fe_fsm_lowm`): cold starts at m = 0.2-0.5 (A also 0.1) with starting_magnetization
   0.2 / 0.5 / 0.8 (the only change between starts), a = 2.866 Å as the FSM run, and the lower-branch E(m)
   (`scripts/fe_fsm_lower_branch.py`). r2SCAN-SB (job 61167271): Fe moments PBE 2.359, r2SCAN 2.778, r2SCAN-SB 2.678, -kin 2.692 μB
-  (not PBE-like); the gate retains 71 % (half) and 93 % (kin) of δ_m overall at ω = 90 (frozen on the converged densities), so the
-  gate width does not limit the correction much; stage R adds SC ω = 0 / 10 / 30. Ni: every run aborted in the TPSS carrier start
-  (random wavefunctions, SG15 files carry no atomic orbitals; divergence at iteration 3 at β 0.3); rerun with the carrier phase at
-  β 0.1, a recorded deviation of the start only.
+  (not PBE-like). Frozen on the converged ω = 90 densities the gate retains 71 % (half) and 93 % (kin) of δ_m, but that does NOT
+  predict the self-consistent response: stage R (job 61170583, SC, same settings) gives r2SCAN-SB (half) |m| = 2.283 / 2.325 /
+  2.429 / 2.678 μB at ω = 0 / 10 / 30 / 90 (PBE 2.359), i.e. strongly gate-limited; r2SCAN-SB-kin 2.678 / 2.679 / 2.682 / 2.692 (ω
+  insensitive: its δ_m is about half of the half-split one, 365 vs 745 meV at ω = 0). Ni (static 3.507 Å): every first run aborted in
+  the TPSS carrier start (random wavefunctions: the SG15 files carry no atomic orbitals; divergence at iteration 3 at β 0.3); with
+  the carrier phase at β 0.1 (a recorded deviation of the start only) all converged: PBE 0.691, r2SCAN 0.696, r2SCAN-SB 0.683,
+  r2SCAN-SB-kin 0.694 μB.
 
 ### 6.11 v4: AFM NiO and MnO gaps (user 2026-11-11; staged: `xcsb.studies.tmo_gap`, `job_tmo_gap.sh`)
 
