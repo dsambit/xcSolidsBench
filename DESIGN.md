@@ -671,6 +671,11 @@ records (sha256 checked), plus explore/spin_balance (the E1 reference function).
   earlier default runs (ω = 90) are relabelled 'r2SCAN-SB(omega=90)' / 'r2SCAN-SB-kin(omega=90)' (run directories renamed,
   RELABEL_omega90.json; records unchanged, their provenance carries ω = 90). The NiO/MnO job runs r2SCAN-SB at ω = 10 plus
   r2SCAN-SB(omega=90) as a labelled comparison.
+  DECISION (user 2026-11-12): the HALF split R0 is ADOPTED for OUR E1 term: '<set>+E1(omega=<w>)' installs sb_model with
+  r0_form 'half' (the model form; the ω fit uses it too); '<set>+E1kin(omega=<w>)' is the labelled comparison. (The earlier frozen
+  item 2 ran with kin as its default and half as a labelled row, before this decision.) SC E1 job (job_e1_sc.sh,
+  `xcsb.studies.fe_e1_sc`, run dir $W/runs/xcsb/v4_2026-11-12_fe_e1_sc): installed A/B at 2.858 Å and A/B + E1 / E1kin at ω 10,
+  30 (FD phase 0 at ω 10), with r2SCAN-SB / -kin at ω 10 for Ni (β 0.1 start) and the Fe points m = 2.2, 2.4, 2.6.
 
 ### 6.11 v4: AFM NiO and MnO gaps (user 2026-11-11; staged: `xcsb.studies.tmo_gap`, `job_tmo_gap.sh`)
 

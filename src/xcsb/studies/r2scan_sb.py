@@ -56,6 +56,9 @@ def tasks(run):
            "tag": f"cb{NI_CARRIER_BETA:g}", "carrier_beta": NI_CARRIER_BETA} for f in FUNCTIONALS]
     t += [{"id": f"SB-Fe__{base}(omega={w:g})", "case": "SB-Fe", "functional": f"{base}(omega={w:g})", "width": 1, "stage": "R",
            "est_s": 1200.0, "tag": ""} for w in OMEGA_DIAG for base in ("r2SCAN-SB", "r2SCAN-SB-kin")]
+    # stage T (user 2026-11-12): the Fe FSM points at omega 10 (the default names), after the omega-90 relabel
+    t += [{"id": f"T__SB-Fe-fsm-{m:.1f}__{f}", "case": f"SB-Fe-fsm-{m:.1f}", "functional": f, "width": 1, "stage": "T",
+           "est_s": 600.0, "tag": ""} for m in FSM_M for f in ("r2SCAN-SB", "r2SCAN-SB-kin")]
     return t
 
 

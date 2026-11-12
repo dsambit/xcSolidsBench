@@ -267,37 +267,42 @@ class XcholeFunctional(PointFunctional):
         return float(ex), float(ec)
 
 
-E1_SPEC = {"ref": "ueg_end", "placement": "base", "r0_form": "kin"}      # E1 as defined (strongxc-v4 working formulation)
+E1_SPEC = {"ref": "ueg_end", "placement": "base"}      # E1 (strongxc-v4 working formulation)
+# the companion state R0 (user decision 2026-11-12): the HALF split is ADOPTED as the model form ('<set>+E1(omega=<w>)'); the kin
+# companion is a labelled comparison ('<set>+E1kin(omega=<w>)')
+E1_FORMS = {"": "half", "kin": "kin"}
 
 
 def parse_e1(name: str):
-    """'SCH-SI-A:v3.1+E1(omega=30)' -> ('SCH-SI-A:v3.1', 30.0)."""
-    m = re.fullmatch(r"(SCH-SI-[AB]:v3\.1)\+E1\(omega=([0-9.eE+-]+)\)", name)
+    """'SCH-SI-A:v3.1+E1(omega=30)' -> ('SCH-SI-A:v3.1', 30.0, 'half') (the model form); '...+E1kin(omega=30)' -> (..., 'kin')."""
+    m = re.fullmatch(r"(SCH-SI-[AB]:v3\.1)\+E1(kin)?\(omega=([0-9.eE+-]+)\)", name)
     if not m:
-        raise KeyError(f"{name!r}: expected '<set>+E1(omega=<value>)'")
-    w = float(m.group(2))
+        raise KeyError(f"{name!r}: expected '<set>+E1(omega=<value>)' or '<set>+E1kin(omega=<value>)'")
+    w = float(m.group(3))
     if not w > 0:
         raise ValueError(f"{name}: omega must be > 0 (omega = 0 is excluded: it loses the one-electron limit)")
-    return m.group(1), w
+    return m.group(1), w, E1_FORMS[m.group(2) or ""]
 
 
 class XcholeE1(XcholeFunctional):
-    """A v3.1 set with the v4 spin-balance correlation term E1 (UEG-gauge reference, base placement, R0 kin) at gate width omega:
+    """A v3.1 set with the v4 spin-balance correlation term E1 (UEG-gauge reference, base placement; R0 half = the model form,
+    R0 kin with the name '+E1kin') at gate width omega:
     strongxc-v4 explore/spin_balance/sb_model.install wraps jax_si.exc_si in THIS process before the model is built, so the
     model's jitted energy and exact JAX derivatives carry the term. omega is fixed at the model's first trace: each construction
     installs again and builds its own model (models built earlier keep theirs). Line v4-e1 (strongxc-v4 76cfa7c20, where this
     path is verified)."""
 
     def __init__(self, name: str):
-        base, w = parse_e1(name)
+        base, w, form = parse_e1(name)
         if XCHOLE_LINE != "v4-e1":
             raise RuntimeError(f"{name}: needs the xchole line v4-e1 (strongxc-v4 76cfa7c20), now {XCHOLE_LINE}")
         import_pinned_xchole()
         root = os.path.dirname(os.path.abspath(os.environ["XCSB_XCHOLE_SRC"]))
         sys.path.insert(0, os.path.join(root, "explore", "spin_balance"))
         import sb_model
-        sb_model.install(E1_SPEC["ref"], w, E1_SPEC["placement"], E1_SPEC["r0_form"])      # before the model is built
+        sb_model.install(E1_SPEC["ref"], w, E1_SPEC["placement"], form)                    # before the model is built
         super().__init__(base)
         self.name = name
-        self._prov.update(kind="xchole + E1 (v4 spin balance)", e1=dict(E1_SPEC, omega=w, module="explore/spin_balance/sb_model.py",
+        self._prov.update(kind="xchole + E1 (v4 spin balance)", e1=dict(E1_SPEC, omega=w, r0_form=form,
+                          r0_status="the model form (half split; user 2026-11-12)" if form == "half" else "labelled comparison", module="explore/spin_balance/sb_model.py",
                           module_sha256=hashlib.sha256(open(sb_model.__file__, "rb").read()).hexdigest()), published_set=False)

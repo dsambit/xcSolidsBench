@@ -58,9 +58,21 @@ def test_plan_and_omega_star(tmp_path, monkeypatch):
 def test_h_inputs_and_names():
     d, w = F.h_atom_inputs()
     assert abs(w @ d[0] - 1.0) < 1e-4 and np.all(d[1] == 0)
-    assert parse_e1("SCH-SI-A:v3.1+E1(omega=30)") == ("SCH-SI-A:v3.1", 30.0)
-    assert parse_e1(F.fname("SCH-SI-B:v3.1", 51.96152422706632)) == ("SCH-SI-B:v3.1", 51.9615)
+    assert parse_e1("SCH-SI-A:v3.1+E1(omega=30)") == ("SCH-SI-A:v3.1", 30.0, "half")
+    assert parse_e1("SCH-SI-A:v3.1+E1kin(omega=30)") == ("SCH-SI-A:v3.1", 30.0, "kin")
+    assert parse_e1(F.fname("SCH-SI-B:v3.1", 51.96152422706632)) == ("SCH-SI-B:v3.1", 51.9615, "half")
     with pytest.raises(ValueError):
         parse_e1("SCH-SI-A:v3.1+E1(omega=0)")
     with pytest.raises(KeyError):
         parse_e1("SCH-SI-A:v3.1+E1@omega=30")
+
+
+def test_e1_sc_tasks():
+    from xcsb.studies import fe_e1_sc as E
+    n = E.names()
+    assert len(n) == 2 + 2 * 2 * 2 and "SCH-SI-B:v3.1+E1kin(omega=30)" in n and "SCH-SI-A:v3.1" in n
+    t = E.tasks("/r")
+    assert "--e1-diag" in E.command("/r", t[2]) and "--e1-diag" not in E.command("/r", t[0])
+    from xcsb.studies import r2scan_sb as S
+    tt = [x for x in S.tasks("/r") if x["stage"] == "T"]
+    assert len(tt) == 6 and {x["functional"] for x in tt} == {"r2SCAN-SB", "r2SCAN-SB-kin"}

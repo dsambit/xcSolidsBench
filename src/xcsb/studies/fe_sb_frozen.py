@@ -284,7 +284,7 @@ def e1_parts(functional_name, grid, rho, tau):
     term Delta E (Ry) and the gate diagnostics overall and in the 3d region (sb_model.e_xc_points at the run's omega)."""
     from ..functional.xchole import parse_e1
     from ..host.evaluate import point_inputs
-    base, w = parse_e1(functional_name)
+    base, w, form = parse_e1(functional_name)
     SB, _, _ = sb_module_any()
     x, _ = point_inputs(grid, rho, tau, True, True)
     N = grid.npts
@@ -297,14 +297,14 @@ def e1_parts(functional_name, grid, rho, tau):
         sl = slice(c0, min(N, c0 + CHUNK))
         args = [x.rho[0][sl], x.rho[1][sl], x.grad[0][:, sl], x.grad[1][:, sl], x.tau[0][sl], x.tau[1][sl], x.lapl[0][sl],
                 x.lapl[1][sl], x.hess[0][:, sl], x.hess[1][:, sl]]
-        o = SB.e_xc_points(*args, base=b, ref="ueg_end", omega=w, placement="base", indicators=True, r0_form="kin")
+        o = SB.e_xc_points(*args, base=b, ref="ueg_end", omega=w, placement="base", indicators=True, r0_form=form)
         ww = np.full(sl.stop - sl.start, grid.weight)
         ex += float(ww @ o["e_x"])
         ec += float(ww @ o["e_c_si"])
         de += float(ww @ o["de"])
         acc.add(o, ww, n[sl])
         acc3.add(o, ww, n[sl], mask=(r3d[sl] <= R_3D))
-    return {"omega": w, "E_x_ry": RY * ex, "E_c_si_ry": RY * ec, "delta_E_ry": RY * de, "E_xc_ry": RY * (ex + ec + de),
+    return {"omega": w, "r0_form": form, "E_x_ry": RY * ex, "E_c_si_ry": RY * ec, "delta_E_ry": RY * de, "E_xc_ry": RY * (ex + ec + de),
             "gate_all": acc.summary(), "gate_3d": acc3.summary()}
 
 

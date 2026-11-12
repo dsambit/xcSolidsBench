@@ -5,7 +5,7 @@ xchole line v4-e1 (strongxc-v4 76cfa7c20). Settings (identical for the target an
 80/320 Ry, 8^3 k, Gaussian 0.02 Ry, conv_thr 1e-8, beta 0.3, cold carrier start. TARGET: our own PBE moment at these settings,
 read from the PBE record of the r2SCAN-SB run (TARGET_RUN; that job computes it once); the pseudopotential offset cancels.
 (The FSM free PBE run, 2.381 mu_B, used a = 2.866 A: not the same settings.)
-Evaluator: SCH-SI-X:v3.1 + E1 (UEG-gauge reference, base placement, R0 kin) via strongxc-v4 sb_model.install (xcsb.functional.
+Evaluator: SCH-SI-X:v3.1 + E1 (UEG-gauge reference, base placement, R0 half: the model form since 2026-11-12) via strongxc-v4 sb_model.install (xcsb.functional.
 xchole.XcholeE1; exact JAX derivatives; FD-checked in phase 0).
 
 1. Bracket (frozen, item 2's omega scan; sb_frozen_summary.json): the implied frozen moments at omega in {10, 30, 90, 300, 1000}
@@ -166,7 +166,7 @@ def h_check(omega, sets=("A", "B")):
     d, w = h_atom_inputs()
     out = {}
     for b in sets:
-        o = SB.e_xc_points(*d, base=b, ref="ueg_end", omega=float(omega[b]), placement="base", indicators=False, r0_form="kin")
+        o = SB.e_xc_points(*d, base=b, ref="ueg_end", omega=float(omega[b]), placement="base", indicators=False, r0_form="half")
         out[b] = {"omega": float(omega[b]), "delta_E_Ha": float(w @ o["de"]), "E_c_si_Ha": float(w @ o["e_c_si"]),
                   "E_x_Ha": float(w @ o["e_x"]), "pass": bool(abs(float(w @ o["de"])) <= H_TOL)}
     return out
