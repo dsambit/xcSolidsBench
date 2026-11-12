@@ -37,10 +37,11 @@ def case_fe80(nspin=2):
 CASES = {"Fe80": lambda: case_fe80(2)}
 
 
-def case_fe80_fsm(m):
-    """Fixed spin moment: QE's tot_magnetization = m (mu_B per cell; two Fermi levels), otherwise case_fe80."""
+def case_fe80_fsm(m, start=0.5):
+    """Fixed spin moment: QE's tot_magnetization = m (mu_B per cell; two Fermi levels), otherwise case_fe80; start = the carrier
+    start's starting_magnetization (the only setting the low-m branch study varies; case name suffix '-s<start>')."""
     return Case(bcc("Fe", A_FE), ecutwfc=80.0, kmesh=(8, 8, 8), occupations="smearing", degauss=0.02, nspin=2,
-                starting_magnetization={"Fe": 0.5}, tot_magnetization=float(m), conv_class="bench")
+                starting_magnetization={"Fe": float(start)}, tot_magnetization=float(m), conv_class="bench")
 
 
 def _kernel(f):

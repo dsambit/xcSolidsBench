@@ -226,7 +226,9 @@ def crosscheck(SB, root, out):
         base, ref, om, pl = parts[0], parts[1], float(parts[2].replace("omega", "")), parts[3]
         r0f = parts[4].split("=")[1] if len(parts) > 4 else "half"
         o = SB.e_xc_points(*args, base=base, ref=ref, omega=om, placement=pl, indicators=False, r0_form=r0f)
-        dev = max(float(np.max(np.abs(np.asarray(o[k]) - np.asarray(v)) / np.maximum(np.abs(np.asarray(v)), 1e-300)))
+        # per key: max |difference| over the 20 points relative to the key's largest stored magnitude (entries near zero, e.g.
+        # de ~ 1e-18, made a pointwise relative deviation meaningless: job 61167245 reported 1.0)
+        dev = max(float(np.max(np.abs(np.asarray(o[k]) - np.asarray(v))) / max(float(np.max(np.abs(np.asarray(v)))), 1e-300))
                   for k, v in stored.items() if k in o and k != "v")
         res["keys"][key] = dev
     res["max_rel_dev"] = max(res["keys"].values())

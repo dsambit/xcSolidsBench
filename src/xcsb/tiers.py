@@ -94,7 +94,8 @@ def get_case(name):
         return m1_case(name)
     if name.startswith("Fe80-fsm-"):
         from .studies.fe_magnetism import case_fe80_fsm
-        return case_fe80_fsm(float(name.split("-")[-1]))
+        parts = name[len("Fe80-fsm-"):].split("-s")
+        return case_fe80_fsm(float(parts[0]), *([float(parts[1])] if len(parts) == 2 else []))
     return all_cases()[name]()
 
 

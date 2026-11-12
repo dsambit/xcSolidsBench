@@ -649,6 +649,19 @@ records (sha256 checked), plus explore/spin_balance (the E1 reference function).
   target (PBE at 2.858 Å from the r2SCAN-SB job) confirmed by the user 2026-11-11. STOP rules: no bracket, a bracket below ω 10, m(ω) not monotone or not reaching
   the target, the H check failing. Co and Ni stay hold-outs.
 
+- Results so far (2026-11-12). Dense scan (job 61167245): TWO FSM branches below m = 1. Cold starts at m = 0.6-0.9 (A; B 0.7-0.8)
+  land 0.036-0.043 Ry below the branch continued from m = 0.5 (w_x,↓ ~0.30 vs ~0.43): the m ≤ 0.5 cold points of the FSM run are
+  on the upper branch, so E″(0) and the Stoner analysis of the earlier curves describe that branch. Warm starts from m = 1.0 all
+  failed at once (the source has 13 bands, the targets 12: QE's default nbnd depends on tot_magnetization; fixed: a wavefunction
+  warm start now takes the source's band count, recorded as a deviation); B 0.9 from 0.5 did not converge in 200 iterations.
+  Follow-up (job_v4_combo.sh, `xcsb.studies.fe_fsm_lowm`): cold starts at m = 0.2-0.5 (A also 0.1) with starting_magnetization
+  0.2 / 0.5 / 0.8 (the only change between starts), a = 2.866 Å as the FSM run, and the lower-branch E(m)
+  (`scripts/fe_fsm_lower_branch.py`). r2SCAN-SB (job 61167271): Fe moments PBE 2.359, r2SCAN 2.778, r2SCAN-SB 2.678, -kin 2.692 μB
+  (not PBE-like); the gate retains 71 % (half) and 93 % (kin) of δ_m overall at ω = 90 (frozen on the converged densities), so the
+  gate width does not limit the correction much; stage R adds SC ω = 0 / 10 / 30. Ni: every run aborted in the TPSS carrier start
+  (random wavefunctions, SG15 files carry no atomic orbitals; divergence at iteration 3 at β 0.3); rerun with the carrier phase at
+  β 0.1, a recorded deviation of the start only.
+
 ### 6.11 v4: AFM NiO and MnO gaps (user 2026-11-11; staged: `xcsb.studies.tmo_gap`, `job_tmo_gap.sh`)
 
 Reproduction of the Perdew group's statement (private communication) that spin-balanced r2SCAN improves the NiO and MnO gaps:

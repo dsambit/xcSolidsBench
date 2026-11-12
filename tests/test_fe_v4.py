@@ -103,3 +103,14 @@ def test_points_and_curves(tmp_path):
 def test_pin_table():
     from xcsb.functional import xchole
     assert set(xchole.XCHOLE_PINS) == {"v3.1", "v4", "v4-sb", "v4-e1"} and xchole.XCHOLE_PIN == xchole.XCHOLE_PINS[xchole.XCHOLE_LINE]
+
+
+def test_lowm_cases():
+    from xcsb.studies import fe_fsm_lowm as L
+    from xcsb.tiers import get_case
+    t = L.tasks("/r")
+    assert len(t) == (5 + 4) * 3 and len({x["id"] for x in t}) == len(t)
+    c = get_case("Fe80-fsm-0.3-s0.8")
+    assert c.tot_magnetization == 0.3 and c.starting_magnetization == {"Fe": 0.8}
+    assert get_case("Fe80-fsm-0.3").starting_magnetization == {"Fe": 0.5}
+    assert abs(np.linalg.norm(c.structure.lattice[0]) * 2 / np.sqrt(3) / 1.8897261246257702 - 2.866) < 1e-9

@@ -1,0 +1,102 @@
+{
+ "settings": "80/320 Ry, 8^3 k, Gaussian 0.02 Ry, conv_thr 1e-8, beta 0.3, FM start 0.5, static lattice",
+ "caveat": "SG15 ONCV without NLCC: absolute moments carry a pseudopotential error; compare functionals at equal settings",
+ "free": {
+  "Fe|PBE": {
+   "status": "ok",
+   "m": -2.3591735561474847,
+   "abs_m": 2.516468185097409,
+   "etot_ry": -236.71078324830629,
+   "iterations": 15,
+   "error": null
+  },
+  "Fe|r2SCAN": {
+   "status": "ok",
+   "m": -2.778307314372519,
+   "abs_m": 3.1428861711515417,
+   "etot_ry": -236.72555496560292,
+   "iterations": 18,
+   "error": null
+  },
+  "Fe|r2SCAN-SB": {
+   "status": "ok",
+   "m": -2.6775053186739655,
+   "abs_m": 2.978207679267063,
+   "etot_ry": -236.66621968090863,
+   "iterations": 19,
+   "error": null
+  },
+  "Fe|r2SCAN-SB-kin": {
+   "status": "ok",
+   "m": -2.691563886674838,
+   "abs_m": 3.00422917638907,
+   "etot_ry": -236.69797586675836,
+   "iterations": 16,
+   "error": null
+  },
+  "Ni|PBE": null,
+  "Ni|r2SCAN": null,
+  "Ni|r2SCAN-SB": null,
+  "Ni|r2SCAN-SB-kin": null
+ },
+ "fsm_Fe": {
+  "PBE": {
+   "etot_ry": {
+    "2.2": -236.7103029553208,
+    "2.4": -236.71074464553504,
+    "2.6": -236.70939753840818
+   },
+   "E_minus_E2.2_meV": {
+    "2.2": 0.0,
+    "2.4": -6.009501510450035,
+    "2.6": 12.318824661420875
+   }
+  },
+  "r2SCAN": {
+   "etot_ry": {
+    "2.2": -236.70961434672253,
+    "2.4": -236.7172197264678,
+    "2.6": -236.72347711957073
+   },
+   "E_minus_E2.2_meV": {
+    "2.2": 0.0,
+    "2.4": -103.47646289780543,
+    "2.6": -188.61263320637258
+   }
+  },
+  "r2SCAN-SB": {
+   "etot_ry": {
+    "2.2": -236.66112170831764,
+    "2.4": -236.66386131069436,
+    "2.6": -236.66598324043343
+   },
+   "E_minus_E2.2_meV": {
+    "2.2": 0.0,
+    "2.4": -37.274189216690864,
+    "2.6": -66.1445140751105
+   }
+  },
+  "r2SCAN-SB-kin": {
+   "etot_ry": {
+    "2.2": -236.69041813291815,
+    "2.4": -236.69460333174854,
+    "2.6": -236.69760283186002
+   },
+   "E_minus_E2.2_meV": {
+    "2.2": 0.0,
+    "2.4": -56.94253094492773,
+    "2.6": -97.75280898418616
+   }
+  }
+ },
+ "m_minus_PBE": {
+  "Fe|PBE": 0.0,
+  "Fe|r2SCAN": 0.4191337582250343,
+  "Fe|r2SCAN-SB": 0.31833176252648077,
+  "Fe|r2SCAN-SB-kin": 0.33239033052735323,
+  "Ni|PBE": null,
+  "Ni|r2SCAN": null,
+  "Ni|r2SCAN-SB": null,
+  "Ni|r2SCAN-SB-kin": null
+ }
+}
