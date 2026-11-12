@@ -24,7 +24,8 @@ FSM_RUN = os.environ.get("XCSB_FSM_RUN", "/pscratch/sd/d/dsambit/xc_functional_d
 
 
 def case(m):
-    return f"Fe80-fsm-{m:g}"
+    """One decimal, as the FSM run names its points (Fe80-fsm-1.0, not -1)."""
+    return f"Fe80-fsm-{m:.1f}"
 
 
 def _safe(f):
@@ -38,7 +39,7 @@ def source_dir(f, m0, fsm_run=FSM_RUN):
 def tasks(run):
     t = [{"id": f"cold__{case(m)}__{_safe(f)}", "case": case(m), "functional": f, "tag": "", "warm": None, "width": 1,
           "stage": "D", "est_s": 900.0 if f.startswith("SCH") and "#" not in f else 300.0} for m in DENSE_M for f in COLD]
-    t += [{"id": f"warm{m0:g}__{case(m)}__{_safe(f)}", "case": case(m), "functional": f, "tag": f"warm{m0:g}", "warm": m0,
+    t += [{"id": f"warm{m0:.1f}__{case(m)}__{_safe(f)}", "case": case(m), "functional": f, "tag": f"warm{m0:.1f}", "warm": m0,
            "width": 1, "stage": "D", "est_s": 900.0} for m in DENSE_M for f in WARM for m0 in WARM_FROM]
     return t
 
@@ -64,7 +65,7 @@ def command(run, task):
     a = ["scf", "--case", task["case"], "--mode", "hooked", "--name", task["functional"], "--root", run, "--fsm-parts"]
     if task["warm"] is not None:
         a += ["--tag", task["tag"], "--warm-from", source_dir(task["functional"], task["warm"]),
-              "--warm-label", f"warm start from m = {task['warm']:g} (wavefunctions)", "--warm-mode", "wavefunctions"]
+              "--warm-label", f"warm start from m = {task['warm']:.1f} (wavefunctions)", "--warm-mode", "wavefunctions"]
     return a
 
 
@@ -93,12 +94,12 @@ def table(run, fsm_run=FSM_RUN):
         for m in (0.5,) + DENSE_M + (1.0,):
             if m in WARM_FROM:
                 p = os.path.join(run_dir(fsm_run, case(m), "hooked", f), "record.json")
-                rows[f"{m:g}"] = {"cold (FSM run)": _row(json.load(open(p)) if os.path.exists(p) else None)}
+                rows[f"{m:.1f}"] = {"cold (FSM run)": _row(json.load(open(p)) if os.path.exists(p) else None)}
                 continue
             starts = {"cold": _row(record(run, {"case": case(m), "functional": f, "tag": ""}))}
             if f in WARM:
                 for m0 in WARM_FROM:
-                    starts[f"warm{m0:g}"] = _row(record(run, {"case": case(m), "functional": f, "tag": f"warm{m0:g}"}))
+                    starts[f"warm{m0:.1f}"] = _row(record(run, {"case": case(m), "functional": f, "tag": f"warm{m0:.1f}"}))
             ok = {k: v for k, v in starts.items() if v.get("status") == "ok"}
             if len(ok) >= 2:
                 es = [v["etot_ry"] for v in ok.values()]
@@ -107,7 +108,7 @@ def table(run, fsm_run=FSM_RUN):
                     out["branches"].append({"functional": f, "m": m, "spread_ry": spread,
                                             "etot_ry": {k: v["etot_ry"] for k, v in ok.items()}})
                 starts["spread_ry"] = spread
-            rows[f"{m:g}"] = starts
+            rows[f"{m:.1f}"] = starts
         out["rows"][f] = rows
     return out
 

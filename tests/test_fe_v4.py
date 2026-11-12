@@ -47,9 +47,9 @@ def test_dense_tasks():
     assert len(t) == 4 * 4 + 4 * 2 * 2 and len({x["id"] for x in t}) == len(t)
     w = [x for x in t if x["warm"] == 1.0 and x["functional"] == "SCH-SI-B:v3.1" and x["case"] == "Fe80-fsm-0.7"][0]
     c = D.command("/run", w)
-    assert c[c.index("--warm-mode") + 1] == "wavefunctions" and c[c.index("--tag") + 1] == "warm1"
-    assert c[c.index("--warm-from") + 1].endswith("Fe80-fsm-1__hooked__SCH-SI-B_v3.1")
-    assert c[c.index("--warm-label") + 1] == "warm start from m = 1 (wavefunctions)"
+    assert c[c.index("--warm-mode") + 1] == "wavefunctions" and c[c.index("--tag") + 1] == "warm1.0"
+    assert c[c.index("--warm-from") + 1].endswith("Fe80-fsm-1.0__hooked__SCH-SI-B_v3.1")
+    assert c[c.index("--warm-label") + 1] == "warm start from m = 1.0 (wavefunctions)"
     assert case_fe80_fsm(0.7).tot_magnetization == 0.7
 
 
