@@ -139,7 +139,19 @@ def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None =
                 posts.append(("mag_split", lambda g, r, t: split(name, g, r, t)))
             if fsm_parts:
                 from .studies.fe_magnetism import fsm_parts as _fp
-                posts.append(("fsm_parts", lambda g, r, t: _fp(name, g, r, t)))
+                # an E1 run: the parts (switch means w_x per spin, w_c, pieces) of its BASE set on the E1-converged density
+                # (job 61173712: the E1 name is not an xchole set name); labelled in the post
+                fp_name = name
+                if "+E1" in name:
+                    from .functional.xchole import parse_e1
+                    fp_name = parse_e1(name)[0]
+
+                def _fpl(g, r, t, fp_name=fp_name):
+                    out = _fp(fp_name, g, r, t)
+                    if fp_name != name:
+                        out = dict(out, evaluated_with=f"{fp_name} (the base set) on the density of {name}")
+                    return out
+                posts.append(("fsm_parts", _fpl))
             if m1_diag:
                 from .studies.m1_ladder import post_diag
                 posts.append(("m1", post_diag))
