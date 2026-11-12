@@ -57,7 +57,7 @@ def main(argv=None):
     m1.add_argument("what", choices=["tasks", "ec", "table", "report-p"])
     m1.add_argument("--run", required=True)
     mg = sub.add_parser("mgo", help="MgO band gap: task list, tables, the banked reference record (serial; no QE)")
-    mg.add_argument("what", choices=["tasks", "table", "bank"])
+    mg.add_argument("what", choices=["tasks", "table", "bank", "bank-eos"])
     mg.add_argument("--run", required=True)
     pv = sub.add_parser("prep-variant", help="re-solve and cache the norms of norm-dependent xchole variants (serial)")
     pv.add_argument("names", nargs="+")
@@ -114,6 +114,8 @@ def main(argv=None):
             res = G.table(a.run)
             json.dump(res, open(os.path.join(a.run, "gap_table.json"), "w"), indent=1, default=float)
             print(G.render(res))
+        elif a.what == "bank-eos":
+            print(json.dumps(G.bank_eos(a.run), indent=1, default=float))
         else:
             print(json.dumps(G.bank_reference(a.run), indent=1, default=float))
         return 0

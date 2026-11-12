@@ -70,7 +70,7 @@ def test_gaps():
 
 def _rec(run, case, f, gap, etot):
     lat = G._lattice()
-    ecut, k = G.parse_case(case)
+    ecut, k, _ = G.parse_case(case)
     kf = _mesh(k)
     d = run_dir(G.scf_root(run), case, "hooked", f)
     os.makedirs(d, exist_ok=True)
@@ -94,7 +94,22 @@ def test_ec_selection(tmp_path):
     a, b = rows[i - 1], rows[i]
     assert abs(b["etot_ry"] - a["etot_ry"]) * G.RY_MEV / 2 > 1.0 or abs(b["gap_Gamma_ev"] - a["gap_Gamma_ev"]) > 0.02
     ts = G.tasks(run)
+    te = [t for t in ts if t["stage"] == "E"]
+    assert len(te) == 9 and not [t for t in ts if t["stage"] == "G"] and all(t["functional"] == "r2SCAN" for t in te)
+    # the r2SCAN EOS: an exact BM3 curve with a0 = 4.20 A, B0 = 160 GPa, B0' = 4.2 -> EOS.json, then stage G at a0
+    from xcsb.bench.eos import RY_BOHR3_TO_GPA
+    V0, B0, B0p = (4.20 * G.BOHR_PER_ANGSTROM) ** 3 / 4, 160.0 / RY_BOHR3_TO_GPA, 4.2
+    for t in te:
+        v = abs(np.linalg.det(G.get_case(t["case"]).structure.lattice))
+        eta = (V0 / v) ** (2 / 3)
+        e = -150.0 + 9 * V0 * B0 / 16 * ((eta - 1) ** 3 * B0p + (eta - 1) ** 2 * (6 - 4 * eta))
+        _rec(run, t["case"], "r2SCAN", 7.0, e)
+    ts = G.tasks(run)
+    fit = json.load(open(os.path.join(run, "EOS.json")))
+    assert fit["a0_angstrom"] == pytest.approx(4.20, abs=1e-6) and fit["B0_GPa"] == pytest.approx(160.0, rel=1e-6)
+    assert fit["B0_prime"] == pytest.approx(4.2, rel=1e-6) and G.bank_eos(run)["a0_angstrom"] == fit["a0_angstrom"]
     tg = [t for t in ts if t["stage"] == "G"]
+    assert all(G.parse_case(t["case"])[2] == pytest.approx(4.2, abs=1e-6) for t in tg)
     assert len(tg) == 3 * 3 * 4 and all(t["est_s"] > 0 for t in ts) and G.command(run, tg[0])[-2:] == ["--npool", "1"]
     # the grid: SCH-SI drifts with the cutoff by 0.03 eV per rung; k converged from 8^3
     gap0 = {"PBE": 4.45, "r2SCAN": 5.6, "SCH-SI-A:v3.1": 5.0, "SCH-SI-B:v3.1": 5.1}
@@ -109,3 +124,14 @@ def test_ec_selection(tmp_path):
     assert "Selected" in G.render(tab)
     bank = G.bank_reference(run)
     assert set(bank["results"]) == {"PBE", "r2SCAN"} and bank["protocol"]["kmesh"] == 8
+    assert bank["protocol"]["a_angstrom"] == pytest.approx(4.2, abs=1e-6)
+
+
+def test_eos_stops():
+    from xcsb.bench.eos import EOSError, bm3_fit
+    V = np.linspace(100.0, 130.0, 9)
+    with pytest.raises(EOSError, match="inner two thirds"):
+        bm3_fit(V, 0.001 * (V - 102.0) ** 2)                     # minimum near the edge
+    rng = np.random.default_rng(1)
+    with pytest.raises(EOSError, match="rms"):
+        bm3_fit(V, 0.001 * (V - 115.0) ** 2 + 1e-3 * rng.normal(size=9))

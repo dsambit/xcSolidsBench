@@ -2,7 +2,8 @@
 # MgO band gap (xcsb.studies.mgo_gap; DESIGN.md Sec. 6.8): inside ONE 1-node allocation, from the clone this script lives in.
 #   bash scripts/perlmutter/job_mgo_gap.sh <run dir>
 # Phase 0 (~2 min): PBE MgO 40 Ry 6^3 k; its record must give the gaps (eigenvalues, k list, Gamma/X/L found), else STOP.
-# Then the campaign runner: stage P (PBE scan 40-140 Ry, 8^3 k -> EC.json), stage G (4 functionals x 3 cutoffs x 3 k meshes),
+# Then the campaign runner: stage P (PBE scan 40-140 Ry, 8^3 k, at the static a -> EC.json), stage E (r2SCAN E(V), 9 volumes,
+# +-3 % in a, at 2 E_c, 8^3 k -> BM3 a0, EOS.json), stage G (4 functionals x 3 cutoffs x 3 k meshes at a0),
 # quarter-node slots (8 ranks, one QE pool), until done or the deadline; then the tables.
 set -uo pipefail
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
@@ -41,7 +42,7 @@ PYCHK
   if [ $? -eq 0 ]; then touch "$P0/PASS"; else echo "STOP: phase 0 failed" >> "$SUM"; exit 0; fi
 fi
 
-python -m xcsb.campaign --study mgo_gap --run "$RUN" --deadline "$DEADLINE" --slots 4 --stages P,G >> "$RUN/campaign_$JOB.out" 2>&1
+python -m xcsb.campaign --study mgo_gap --run "$RUN" --deadline "$DEADLINE" --slots 4 --stages P,E,G >> "$RUN/campaign_$JOB.out" 2>&1
 echo "campaign rc=$? $(date -Is)" >> "$SUM"
 python -m xcsb.cli mgo table --run "$RUN" > "$RUN/gap_table.md" 2>> "$SUM"
 echo "job $JOB done $(date -Is)" >> "$SUM"

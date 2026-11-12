@@ -2,7 +2,7 @@
 # AFM-II NiO / MnO GKS gaps (xcsb.studies.tmo_gap; v4, xchole line v4-sb = strongxc-v4 b2501727c). One allocation per call:
 #   bash scripts/perlmutter/job_tmo_gap.sh <run dir> <stages: P,G | F>
 # Phase 0 (first allocation): the r2SCAN-SB / -kin energy-vs-potential FD check (tests/test_external_fd.py); a failure STOPS.
-# STOPS at once if no material has a sourced static lattice (tmo_gap.A_STATIC empty: the open item).
+# Cells: the r2SCAN-relaxed AFM cells of Swathilakshmi et al. (tmo_gap.CELLS; the same geometry for every functional).
 set -uo pipefail
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 source "$REPO/scripts/perlmutter/env_xcsb.sh"
@@ -17,8 +17,6 @@ DEADLINE=$(( $(date +%s) + ${XCSB_ALLOC_S:-14400} - 420 ))
 SUM="$RUN/summary.txt"
 python -c "import os, xcsb, sys; sys.exit(0 if os.path.abspath(xcsb.__file__).startswith('$REPO/') else 1)" \
   || { echo "STOP: xcsb is not imported from $REPO" >> "$SUM"; exit 0; }
-python -c "from xcsb.studies.tmo_gap import A_STATIC; import sys; sys.exit(0 if A_STATIC else 1)" \
-  || { echo "STOP: no sourced static lattice for NiO/MnO (tmo_gap.A_STATIC empty)" >> "$SUM"; exit 0; }
 echo "$JOB $(git rev-parse HEAD) xchole $(git -C "$(dirname "$XCSB_XCHOLE_SRC")" rev-parse HEAD) line v4-sb stages $STAGES $(date -Is)" >> "$RUN/COMMITS"
 export OMP_NUM_THREADS=4 OMP_PLACES=cores OMP_PROC_BIND=close
 if [ ! -f "$RUN/phase0_PASS" ]; then

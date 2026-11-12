@@ -44,20 +44,22 @@ RY_MEV = 1000 * RY_EV
 NPOOL = 1                           # one pool: QE's k list (eigenvalues) is then complete on every rank
 
 
-def case_name(ecut, k):
-    return f"MgO-{ecut:g}-k{int(k)}"
+def case_name(ecut, k, a=None):
+    """'MgO-<ecut>-k<n>' at the static lattice (the PBE cutoff scan), 'MgO-<ecut>-k<n>-a<a>' at lattice constant a (Angstrom)."""
+    return f"MgO-{ecut:g}-k{int(k)}" + ("" if a is None else f"-a{a:.6f}")
 
 
 def parse_case(name):
-    tag, ecut, k = name.split("-")
-    if tag != "MgO" or not k.startswith("k"):
+    parts = name.split("-")
+    if parts[0] != "MgO" or len(parts) not in (3, 4) or not parts[2].startswith("k"):
         raise KeyError(f"not an MgO case name: {name!r}")
-    return float(ecut), int(k[1:])
+    a = float(parts[3][1:]) if len(parts) == 4 else A_STATIC_ANGSTROM
+    return float(parts[1]), int(parts[2][1:]), a
 
 
 def get_case(name) -> Case:
-    ecut, k = parse_case(name)
-    return Case(rocksalt("Mg", "O", A_STATIC_ANGSTROM * BOHR_PER_ANGSTROM), ecutwfc=ecut, kmesh=(k, k, k), kshift=(0, 0, 0),
+    ecut, k, a = parse_case(name)
+    return Case(rocksalt("Mg", "O", a * BOHR_PER_ANGSTROM), ecutwfc=ecut, kmesh=(k, k, k), kshift=(0, 0, 0),
                 occupations="fixed", nspin=1, nbnd=NBND, diago_full_acc=True, conv_class="bench")
 
 
@@ -167,9 +169,36 @@ def e_c_pbe(run):
     return rows[n]["ecutwfc"]
 
 
-# ---- stage G: the (cutoff, k) grid ------------------------------------------------------------------------------------------------
-def stage_g_tasks(ec):
-    return [{"id": f"G__{case_name(round(r * ec, 6), k)}__{f}", "case": case_name(round(r * ec, 6), k), "functional": f,
+# ---- stage E: the r2SCAN lattice constant (user 2026-11-11: r2SCAN lattices for the gap tests) -----------------------------------
+EOS_DELTA = tuple(np.linspace(-0.03, 0.03, 9))   # a = a_static (1 + delta): 9 volumes over about +-3 % in a
+EOS_RUNG, EOS_K = 2.0, 8                          # the EOS at the top cutoff rung (RUNGS[-1] E_c^PBE) and 8^3 k
+
+
+def stage_e_tasks(ec):
+    e = round(EOS_RUNG * ec, 6)
+    return [{"id": f"E__{case_name(e, EOS_K, A_STATIC_ANGSTROM * (1 + d))}__r2SCAN", "case": case_name(e, EOS_K, A_STATIC_ANGSTROM * (1 + d)),
+             "functional": "r2SCAN", "width": 1, "stage": "E", "tag": ""} for d in EOS_DELTA]
+
+
+def eos(run, ec):
+    """The r2SCAN BM3 fit over stage E, or None while incomplete; raises (EOSError) on a failed fit."""
+    from ..bench.eos import bm3_fit
+    V, E, rows = [], [], []
+    for t in stage_e_tasks(ec):
+        r = record(run, t["case"], "r2SCAN")
+        if not _ok(r):
+            return None
+        _, _, a = parse_case(t["case"])
+        v = abs(float(np.linalg.det(get_case(t["case"]).structure.lattice)))
+        V.append(v), E.append(r["energies_ry"]["etot"]), rows.append({"a_angstrom": a, "V_bohr3": v, "etot_ry": E[-1]})
+    fit = bm3_fit(V, E)
+    a0 = (4.0 * fit["V0_bohr3"]) ** (1.0 / 3.0) / BOHR_PER_ANGSTROM            # fcc primitive: V = a^3 / 4
+    return dict(fit, a0_angstrom=float(a0), points=rows, ecutwfc=round(EOS_RUNG * ec, 6), k=EOS_K)
+
+
+# ---- stage G: the (cutoff, k) grid at the r2SCAN a0 -------------------------------------------------------------------------------
+def stage_g_tasks(ec, a0):
+    return [{"id": f"G__{case_name(round(r * ec, 6), k, a0)}__{f}", "case": case_name(round(r * ec, 6), k, a0), "functional": f,
              "width": 1, "stage": "G", "tag": "", "rung": r, "k": k} for r in RUNGS for k in KMESHES for f in FUNCTIONALS]
 
 
@@ -194,7 +223,7 @@ def fft_points(ecut, dual=4):
 
 
 def estimate_s(task):
-    ecut, k = parse_case(task["case"])
+    ecut, k, _ = parse_case(task["case"])
     qe = 3.7 * (124.0 / 79.4) * 0.5 * (NK_IBZ[k] / 29.0) * (ecut / 80.0) ** 1.5
     sch = task["functional"].startswith("SCH-SI")
     chunks = -(-fft_points(ecut) // 16384)
@@ -204,7 +233,8 @@ def estimate_s(task):
 
 
 def tasks(run):
-    """Stage P, then (once the scan is complete) stage G; EC.json written once."""
+    """Stage P; then (scan complete; EC.json written once) stage E, the r2SCAN EOS; then (fit done; EOS.json written once, or
+    EOS_STOP.txt on a failed fit and no stage G) stage G at a0."""
     out = [dict(t, est_s=estimate_s(t)) for t in stage_p_tasks()]
     p = os.path.join(run, "EC.json")
     if os.path.exists(p):
@@ -215,7 +245,22 @@ def tasks(run):
             return out
         json.dump({"ec_pbe": ec, "scan": scan_table(run), "criteria": {"de_mev_per_atom": CRIT_DE_MEV, "gap_ev": GAP_TOL}},
                   open(p, "w"), indent=1)
-    return out + [dict(t, est_s=estimate_s(t)) for t in stage_g_tasks(ec)]
+    out += [dict(t, est_s=estimate_s(t)) for t in stage_e_tasks(ec)]
+    pe = os.path.join(run, "EOS.json")
+    if not os.path.exists(pe):
+        if os.path.exists(os.path.join(run, "EOS_STOP.txt")):
+            return out
+        from ..bench.eos import EOSError
+        try:
+            fit = eos(run, ec)
+        except EOSError as exc:
+            open(os.path.join(run, "EOS_STOP.txt"), "w").write(f"{exc}\n")
+            return out
+        if fit is None:
+            return out
+        json.dump(fit, open(pe, "w"), indent=1)
+    a0 = round(json.load(open(pe))["a0_angstrom"], 6)
+    return out + [dict(t, est_s=estimate_s(t)) for t in stage_g_tasks(ec, a0)]
 
 
 def done(run, task):
@@ -248,15 +293,19 @@ def table(run):
     lat = _lattice()
     pe = os.path.join(run, "EC.json")
     ec = json.load(open(pe))["ec_pbe"] if os.path.exists(pe) else None
-    out = {"a_angstrom": A_STATIC_ANGSTROM, "a_source": A_SOURCE, "ec_pbe": ec, "scan": scan_table(run), "grid": {},
-           "selected": None}
-    if ec is None:
+    pf = os.path.join(run, "EOS.json")
+    fit = json.load(open(pf)) if os.path.exists(pf) else None
+    a0 = None if fit is None else round(fit["a0_angstrom"], 6)
+    out = {"a_scan_angstrom": A_STATIC_ANGSTROM, "a_scan_source": A_SOURCE, "a_angstrom": a0,
+           "a_source": "r2SCAN BM3 a0 of this run (EOS.json; user 2026-11-11)", "eos": fit, "ec_pbe": ec, "scan": scan_table(run),
+           "grid": {}, "selected": None}
+    if ec is None or a0 is None:
         return out
     grid = {}
     for r in RUNGS:
         for k in KMESHES:
             for f in FUNCTIONALS:
-                rec = record(run, case_name(round(r * ec, 6), k), f)
+                rec = record(run, case_name(round(r * ec, 6), k, a0), f)
                 grid[(f, r, k)] = _row(rec, lat) if _ok(rec) else None
     out["grid"] = {f"{f}|r{r:g}|k{k}": v for (f, r, k), v in grid.items()}
     r_sel, r_conv = _select(grid, RUNGS, None, lambda f, v: (f, v, KMESHES[-1]))
@@ -278,7 +327,7 @@ def bank_reference(run):
     if t["selected"] is None:
         raise RuntimeError("no selected settings yet")
     return {"what": "MgO GKS band gaps of the reference functionals through the xcSolidsBench hooks",
-            "protocol": {"cell": "rock salt, primitive, 2 atoms", "a_angstrom": A_STATIC_ANGSTROM, "a_source": A_SOURCE,
+            "protocol": {"cell": "rock salt, primitive, 2 atoms", "a_angstrom": t["a_angstrom"], "a_source": t["a_source"],
                          "pseudopotentials": "SG15 ONCV 1.2 (Mg, O), no NLCC", "nspin": 1, "occupations": "fixed",
                          "nbnd": NBND, "diago_full_acc": True, "dual": 4, "ec_pbe": t["ec_pbe"],
                          "ecutwfc": t["selected"]["ecutwfc"], "kmesh": t["selected"]["k"], "kshift": [0, 0, 0],
@@ -287,8 +336,26 @@ def bank_reference(run):
             "grid": {k: v for k, v in t["grid"].items() if k.split("|")[0] in REFERENCE}}
 
 
+def bank_eos(run):
+    """The archive-ready r2SCAN EOS result (a reference-functional result: banked once, write-once)."""
+    p = os.path.join(run, "EOS.json")
+    if not os.path.exists(p):
+        raise RuntimeError("no EOS.json")
+    fit = json.load(open(p))
+    return {"what": "r2SCAN lattice constant of rock-salt MgO through the xcSolidsBench hooks (BM3 fit; user 2026-11-11)",
+            "protocol": {"pseudopotentials": "SG15 ONCV 1.2 (Mg, O), no NLCC", "nspin": 1, "occupations": "fixed", "dual": 4,
+                         "ecutwfc": fit["ecutwfc"], "kmesh": fit["k"], "volumes": "a = a_static (1 + delta), delta in [-0.03, 0.03], 9 points",
+                         "a_static_angstrom": A_STATIC_ANGSTROM, "fit": "third-order Birch-Murnaghan (xcsb.bench.eos)"},
+            "a0_angstrom": fit["a0_angstrom"], "B0_GPa": fit["B0_GPa"], "B0_prime": fit["B0_prime"], "rms_ry": fit["rms_ry"],
+            "points": fit["points"]}
+
+
 def render(t) -> str:
-    out = ["# MgO band gap (GKS eigenvalue gaps, eV)", f"a = {t['a_angstrom']} A ({t['a_source']})", ""]
+    out = ["# MgO band gap (GKS eigenvalue gaps, eV)", f"a = {t['a_angstrom']} A ({t['a_source']}); the PBE cutoff scan at "
+           f"{t['a_scan_angstrom']} A", ""]
+    if t.get("eos"):
+        e = t["eos"]
+        out.append(f"r2SCAN EOS: a0 {e['a0_angstrom']:.5f} A, B0 {e['B0_GPa']:.1f} GPa, B0' {e['B0_prime']:.2f}, rms {e['rms_ry']:.1e} Ry")
     out.append("## PBE cutoff scan (k 8^3): criteria |dE| <= 1 meV/atom, |d gap_Gamma| <= 0.02 eV")
     out.append("| ecutwfc | E (Ry) | gap Gamma | min gap | it |")
     out.append("|---|---|---|---|---|")

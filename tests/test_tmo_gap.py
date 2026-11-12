@@ -12,21 +12,26 @@ from xcsb.studies import tmo_gap as T
 PDIR = os.environ.get("XCSB_PSEUDO_DIR")
 
 
-def test_no_lattice_no_case():
-    assert T.A_STATIC == {}
-    with pytest.raises(KeyError, match="no sourced static-lattice"):
-        T.get_case("TMO-NiO-100-k4")
+def test_cells():
+    for mat, tm in (("NiO", "Ni"), ("MnO", "Mn")):
+        st = T.structure(mat)
+        L = st.lattice / T.BOHR_PER_ANGSTROM
+        assert st.labels[:2] == [f"{tm}1", f"{tm}2"] and st.elements[f"{tm}2"] == tm and st.nat == 4
+        lens = sorted(np.round(np.linalg.norm(L, axis=1), 2))
+        assert lens == ([2.94, 2.94, 5.87] if mat == "NiO" else [3.15, 3.15, 6.19])
+    assert T.kmesh("NiO", 6) == (6, 3, 6) and T.kmesh("MnO", 6) == (6, 6, 3)
 
 
 @pytest.fixture
-def lattice(monkeypatch):
-    monkeypatch.setattr(T, "A_STATIC", {"NiO": (4.17, "test"), "MnO": (4.44, "test")})
+def lattice():
+    return None
 
 
 @pytest.mark.skipif(not PDIR or not os.path.isdir(PDIR), reason="XCSB_PSEUDO_DIR not set")
 def test_inputs(lattice):
     for mat, tm, nb in (("NiO", "Ni", 24 + 8), ("MnO", "Mn", 21 + 8)):
         txt = pw_input(T.get_case(f"TMO-{mat}-100-k4"), "TPSS", PDIR, "/tmp/o", "x")
+        assert "K_POINTS automatic" in txt
         for s in ("occupations = 'fixed'", "tot_magnetization = 0.000000", f"nbnd = {nb}", "diago_full_acc = .true.",
                   "starting_magnetization(1) = 0.500000", "starting_magnetization(2) = -0.500000", f"{tm}1 1.0 {tm}_ONCV_PBE-1.2.upf",
                   "nat = 4", "ntyp = 3"):
@@ -48,7 +53,7 @@ def test_gaps_lsda():
 
 def test_site_moments(lattice):
     s = T.get_case("TMO-NiO-100-k4").structure
-    g = SpectralGrid(s.lattice, (24, 24, 24), 60.0)
+    g = SpectralGrid(s.lattice, (24, 48, 24), 60.0)
     rho = np.full((2,) + g.shape, 0.05)
     r = g.points()
     import itertools

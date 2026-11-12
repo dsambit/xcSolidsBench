@@ -3,18 +3,18 @@ r2SCAN-SB, r2SCAN-SB-kin (strongxc-v4 b2501727c, xchole line v4-sb). Reproductio
 balanced r2SCAN improves the NiO and MnO gaps (private communication, no numbers). By spin-flip symmetry the term and its
 potential vanish at spin-symmetric states, so only magnetic insulators can show it.
 
-Cell: rock-salt parent, AFM-II order in the rhombohedral 4-atom cell (2 TM + 2 O; structures.rocksalt_afm2), the rhombohedral
-distortion of the real low-temperature crystals IGNORED; nspin 2 with opposite starting moments on TM1 and TM2 (+-0.5, O 0),
+Cell (user decision 2026-11-11: r2SCAN lattices for the gap tests, replacing the static-lattice rule Q10 for these tests only; the
+SAME geometry for every functional): the r2SCAN-relaxed AFM cells of Swathilakshmi et al. (VASP PAW, no U; CELLS, 4 atoms, MnO's
+relaxed rhombohedral distortion kept), their magnetic order (TM1 +, TM2 -); nspin 2 with starting moments +-0.5 on TM1/TM2 (O 0),
 fixed occupations with tot_magnetization 0 (an AFM insulator; QE needs it for fixed occupations with nspin 2), no Hubbard U,
 nbnd = n_occ + N_EMPTY with diago_full_acc. SG15 Ni (18 e), Mn (15 e), O (6 e). Plain Broyden beta 0.3 (the global setting).
 
-LATTICE: static-lattice experimental constants (Q10). The Zhang et al. NJP 2018 SM has neither NiO nor MnO: A_STATIC is EMPTY
-and every case raises until sourced values are banked in the archive and entered here (open item).
 
 Stage P: PBE on ecutwfc in SCAN_ECUT at k SCAN_K^3; E_c^PBE = the smallest cutoff from which every successive pair meets the
 family criteria (F4: TM site moment 0.01 mu_B, GKS gap 0.02 eV, E_tot 1 meV per formula unit). Stage G (short, as MgO but not the
-full grid, for cost): PBE at r E_c, r in RUNGS, at k SCAN_K^3, and at E_c with k in KMESHES (8^3 on a full node); selected: the
-smallest r whose gap is within GAP_TOL of r = 2 (at k 4^3), and the smallest k within GAP_TOL of 8^3 (at r = 1).
+full grid, for cost): PBE at r E_c, r in RUNGS, at k level SCAN_K, and at E_c with k levels in KMESHES (level 8 on a full node);
+selected: the smallest r whose gap is within GAP_TOL of r = 2 (at level 4), and the smallest level within GAP_TOL of 8 (r = 1).
+k level n: the mesh n x K_RATIO (NiO (n, n/2, n), MnO (n, n, n/2): the cells' vector lengths are 1 : 2 : 1, resp. 1 : 1 : 2).
 Stage F: all four functionals at the selected settings (SETTINGS.json).
 
 Reported per functional: the GKS gap (minimum over the SCF mesh: min CBM - max VBM over both spins, with the k points and spins
@@ -27,16 +27,26 @@ import os
 
 import numpy as np
 
-from ..bench.structures import BOHR_PER_ANGSTROM, rocksalt_afm2
+from ..bench.structures import BOHR_PER_ANGSTROM, Structure
 from ..host.qe import Case
 
-A_STATIC = {}                   # {"NiO": (a_static Angstrom, archive entry), "MnO": (...)}: NOT SOURCED (open item)
+CELLS = {   # r2SCAN-relaxed AFM cells (Angstrom), refdata solids/tmo_structures_r2scan_relaxed_2026-11-11 (VASP PAW, no U;
+            # github.com/sai-mat-group/r2SCAN-U-benchmarking 839f4a00; MnO reduced to its 4-atom magnetic cell)
+    "NiO": {"lattice": [[-2.078635741697, -2.078626628018, 2.3472835e-05], [-4.15324698531, -0.00397776583, -4.153468055165], [2.184253e-05, -2.078624533681, -2.078745830413]],
+            "species": ["Ni", "Ni", "O", "O"], "moment_sign": [1, -1, 0, 0],
+            "frac": [[0.999990618547, 0.999994920069, 9.829876e-06], [0.99999048819, 0.499994825665, 1.000864e-05], [0.499994443025, 0.250027612838, 0.499975116415], [0.500024450238, 0.749982641428, 0.50000504507]]},
+    "MnO": {"lattice": [[-2.228993751143, -2.22900055676, 8.0133832e-05], [-2.228993957775, 8.0276439e-05, -2.22900121913], [-0.083940840838, -4.373899492773, -4.373900986848]],
+            "species": ["Mn", "Mn", "O", "O"], "moment_sign": [1, -1, 0, 0],
+            "frac": [[2.904761e-06, 0.999992861733, 1.555068e-06], [0.999999790151, 4.12417e-07, 0.499999955974], [0.499999890919, 0.500000379389, 0.249999962689], [0.500000111636, 0.500000726412, 0.749999804913]]},
+}
+CELL_SOURCE = "refdata solids/tmo_structures_r2scan_relaxed_2026-11-11"
+K_RATIO = {"NiO": (1.0, 0.5, 1.0), "MnO": (1.0, 1.0, 0.5)}   # k mesh = n x ratio (the cells' lattice-vector lengths 1 : 2 : 1, resp. 1 : 1 : 2)
 TM = {"NiO": "Ni", "MnO": "Mn"}
 ZVAL = {"Ni": 18, "Mn": 15, "O": 6}
 N_EMPTY = 8
 FUNCTIONALS = ("PBE", "r2SCAN", "r2SCAN-SB", "r2SCAN-SB-kin")
 SCAN_ECUT = (60.0, 80.0, 100.0, 120.0, 140.0)
-SCAN_K = 4
+SCAN_K = 4                      # k level n: mesh = n x K_RATIO
 RUNGS = (1.0, 1.5, 2.0)
 KMESHES = (4, 6, 8)
 CRIT_MOMENT, CRIT_GAP, CRIT_DE_MEV = 0.01, 0.02, 1.0
@@ -60,14 +70,22 @@ def parse_case(name):
     return mat, float(ecut), int(k[1:])
 
 
+def structure(mat):
+    c, tm = CELLS[mat], TM[mat]
+    labels = [f"{tm}1" if sg > 0 else f"{tm}2" if sg < 0 else sp for sp, sg in zip(c["species"], c["moment_sign"])]
+    elements = {lab: (tm if lab.startswith(tm) else "O") for lab in labels}
+    return Structure(f"afm-{mat}-r2scan", np.asarray(c["lattice"]) * BOHR_PER_ANGSTROM, labels, np.asarray(c["frac"]), elements)
+
+
+def kmesh(mat, n):
+    return tuple(max(1, int(round(n * r))) for r in K_RATIO[mat])
+
+
 def get_case(name) -> Case:
     mat, ecut, k = parse_case(name)
-    if mat not in A_STATIC:
-        raise KeyError(f"{mat}: no sourced static-lattice constant (Zhang et al. SM has no NiO/MnO; open item): not runnable")
-    a, _ = A_STATIC[mat]
     tm = TM[mat]
-    s = rocksalt_afm2(tm, "O", a * BOHR_PER_ANGSTROM)
-    return Case(s, ecutwfc=ecut, kmesh=(k, k, k), occupations="fixed", nspin=2, tot_magnetization=0.0,
+    s = structure(mat)
+    return Case(s, ecutwfc=ecut, kmesh=kmesh(mat, k), occupations="fixed", nspin=2, tot_magnetization=0.0,
                 starting_magnetization={tm + "1": 0.5, tm + "2": -0.5, "O": 0.0}, nbnd=n_occ(mat) + N_EMPTY, diago_full_acc=True,
                 conv_class="bench")
 
@@ -170,9 +188,9 @@ def selected(run, mat, ec):
             "k_converged": k_sel != KMESHES[-1], "grid_gaps_ev": {f"r{a:g}|k{b}": v for (a, b), v in g.items()}}
 
 
-# cost (scheduling): QE ~32 s per SCF iteration at 100 Ry, 4^3 k (about 13 irreducible points), quarter node: the Fe 80 Ry
-# timing (3.7 s, 29 k, 1 atom) scaled by ~14 for 4 atoms (plane waves x bands) and by the k count; ~100 iterations (carrier and
-# hook; AFM is slow); the k count ~ (k/4)^3; a full node (8^3) ~3.5 x faster.
+# cost (scheduling): QE ~32 s per SCF iteration at 100 Ry, k level 4 (a 4 x 2 x 4-type mesh), quarter node: the Fe 80 Ry timing
+# (3.7 s, 29 k, 1 atom) scaled by ~14 for 4 atoms (plane waves x bands) and by the k count; ~100 iterations (carrier and hook;
+# AFM is slow); the k count ~ (n/4)^3; a full node (level 8) ~3.5 x faster.
 def _task(mat, ecut, k, f, stage):
     w = 4 if k >= 8 else 1
     est = 32.0 * 100 * (ecut / 100.0) ** 1.5 * (k / 4.0) ** 3 / (3.5 if w == 4 else 1.0)
@@ -182,7 +200,7 @@ def _task(mat, ecut, k, f, stage):
 
 def tasks(run):
     t = []
-    for mat in A_STATIC:
+    for mat in CELLS:
         t += [_task(mat, e, SCAN_K, "PBE", "P") for e in SCAN_ECUT]
         ec, _ = e_c_pbe(run, mat)
         if ec is None:
@@ -215,8 +233,8 @@ def command(run, task):
 
 
 def table(run):
-    out = {"a_static": A_STATIC, "r_site_bohr": R_SITE, "materials": {}}
-    for mat in A_STATIC:
+    out = {"cells": CELL_SOURCE, "r_site_bohr": R_SITE, "materials": {}}
+    for mat in CELLS:
         ec, scan = e_c_pbe(run, mat)
         p = os.path.join(run, f"SETTINGS_{mat}.json")
         sel = json.load(open(p)) if os.path.exists(p) else None
