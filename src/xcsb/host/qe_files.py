@@ -50,18 +50,20 @@ IMAG_TOL = 1e-5      # relative imaginary part tolerated (QE's saved LSDA magnet
 
 
 def to_grid(mill, coeffs, shape, info=None):
-    """Real-space values (ncomp, n1, n2, n3) of sum_G c_G exp(i G.r) on QE's grid (the real part; the relative imaginary part
-    of each component goes to info['rel_imag'] and raises above IMAG_TOL); raises if a G vector does not fit."""
+    """Real-space values (ncomp, n1, n2, n3) of sum_G c_G exp(i G.r) on QE's grid (the real part; the imaginary part of each
+    component relative to the largest value of the FIRST component (the total density, resp. the up channel; a magnetization can
+    vanish) goes to info['rel_imag'] and raises above IMAG_TOL); raises if a G vector does not fit."""
     n = np.array(shape)
     if np.any(np.abs(mill) > (n - 1) // 2):
         raise ValueError(f"Miller indices up to {np.abs(mill).max(0)} do not fit the grid {tuple(shape)}")
     idx = tuple((mill % n).T)
-    out = []
+    out, scale = [], None
     for c in coeffs:
         F = np.zeros(tuple(shape), complex)
         F[idx] = c
         f = np.fft.ifftn(F) * F.size
-        rel = float(np.max(np.abs(f.imag)) / max(np.max(np.abs(f.real)), 1e-300))
+        scale = float(np.max(np.abs(f.real))) if scale is None else scale
+        rel = float(np.max(np.abs(f.imag)) / max(scale, 1e-300))
         if info is not None:
             info.setdefault("rel_imag", []).append(rel)
         if rel > IMAG_TOL:
