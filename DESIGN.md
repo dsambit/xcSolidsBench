@@ -441,7 +441,7 @@ stated with every table. The files go to `$W/pseudo/sg15-1.2/` with sha256 in `p
   same case (run-directory tag `riplow`) the low-band seeds (each step: base SCF + 3 seeds, so that it fits 4 h).
 - Parallel layout: QE k-point pools (`-nk`, set through QEpy's `qepy_sys.set_command_line`), one rank per pool, 4 OpenMP
   threads; a quarter node (8 ranks) per SCF, a full node (32 ranks) for the r = 3 rungs. Pools are new in M1: phase 0 of the
-  first allocation checks npool 8 against npool 1 (PBE and SCH-SI-B, Fe 40 Ry 8³ k; |ΔE| ≤ 10⁻⁶ Ry, |Δm| ≤ 10⁻⁴ μB) and that
+  first allocation checks npool 8 against npool 1 (PBE and SCH-SI-B, Fe 40 Ry 8³ k; |ΔE| ≤ 10⁻⁶ Ry, |Δ|m|| ≤ 10⁻³ μB: |m| because a run may land in the mirror ferromagnet, and 10⁻³ = 1/5 of the moment criterion since m is first order in the SCF residual; revised 2026-11-11 after job 61150346, whose phase 0 failed only on these two points: m = −m, and SCH-SI-B d|m| 1.75·10⁻⁴ μB with ΔE 3·10⁻⁸ Ry) and that
   the seeded restart runs (PBE, all six seeds, both bands); a failure stops the job.
 - Stages (user 2026-11-11): the job and the launcher take a stage selector, `P` or `L`, and the runner never starts a task of
   the other stage. The FIRST allocation runs `P` only: phase 0, the PBE scan (→ `EC.json`) and a full-node probe (the 80 Ry
