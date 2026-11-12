@@ -17,10 +17,11 @@ case $WHAT in
   combo) RUN=$W/runs/xcsb/v4_2026-11-12_fe_fsm_lowm; JOBS=job_v4_combo.sh; ARG2=""; T=02:00:00; AS=7200; LINE=v4-sb;;
   e1sc) RUN=$W/runs/xcsb/v4_2026-11-12_fe_e1_sc; JOBS=job_e1_sc.sh; ARG2=$W/runs/xcsb/v4_2026-11-12_r2scan_sb; T=02:00:00; AS=7200; LINE=v4-e1;;
   e1scan) RUN=$W/runs/xcsb/v4_2026-11-12_fe_e1_sc; JOBS=job_e1_scan.sh; ARG2=""; T=02:00:00; AS=7200; LINE=v4-e1;;
+  e1branch) RUN=$W/runs/xcsb/v4_2026-11-12_fe_e1_branch; JOBS=job_e1_branch.sh; ARG2=$W/runs/xcsb/v4_2026-11-12_fe_e1_sc; T=02:00:00; AS=7200; LINE=v4-e1;;
   fit) RUN=$W/runs/xcsb/v4_2026-11-12_fe_omega_fit; JOBS=job_fe_omega_fit.sh; T=01:30:00; AS=5400; LINE=v4-e1;;
   tmo-pg) RUN=$W/runs/xcsb/v4_2026-11-12_tmo_gap; JOBS="job_tmo_gap.sh"; ARG2=P,G; T=04:00:00; AS=14400; LINE=v4-sb;;
   tmo-f)  RUN=$W/runs/xcsb/v4_2026-11-12_tmo_gap; JOBS="job_tmo_gap.sh"; ARG2=F; T=04:00:00; AS=14400; LINE=v4-sb;;
-  *) echo "sb, sb2, combo, e1sc, e1scan, fit, tmo-pg or tmo-f" >&2; exit 2;;
+  *) echo "sb, sb2, combo, e1sc, e1scan, e1branch, fit, tmo-pg or tmo-f" >&2; exit 2;;
 esac
 mkdir -p "$RUN"
 C=$(git -C $W/xcSolidsBench.git rev-parse main)

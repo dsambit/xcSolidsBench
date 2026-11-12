@@ -94,3 +94,12 @@ def test_m_of_omega(tmp_path, monkeypatch):
     assert a["monotone"] and 30 < a["omega_at_target"] < 60 and 10 < a["omega_at_pbe"] < 30
     assert E.m_of_omega(run, target=None)["sets"]["SCH-SI-B:v3.1"]["omega_at_target"] is None
     assert E.TARGET_MOMENT == 2.22 and E.m_of_omega(run)["target"] == 2.22
+
+
+def test_e1_branch_tasks():
+    from xcsb.studies import fe_e1_branch as Bm
+    t = Bm.tasks("/r")
+    assert len(t) == 4 * 3 + 8 * 3 and len({x["id"] for x in t}) == len(t)
+    w = [x for x in t if x["warm"] == 150.0 and x["case"] == "SB-Fe"][0]
+    c = Bm.command("/r", w)
+    assert c[c.index("--warm-from") + 1].endswith("SB-Fe__hooked__SCH-SI-B_v3.1+E1(omega150)") and "--e1-diag" in c
