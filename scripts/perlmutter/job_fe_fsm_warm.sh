@@ -1,14 +1,16 @@
 #!/bin/bash
 # One production warm-start rerun of an FSM point (user 2026-11-11: Fe80-fsm-2.8, SCH-SI-B:v3.1, from the converged m = 2.6
-# point): QE reads that run's wavefunctions, rho and tau (startingwfc/startingpot 'file'), the hook starts directly; same
+# point). Mode 'wavefunctions' (second attempt; the first, mode 'files', failed: the read-back density was negative): QE
+# reads that run's wavefunctions only (startingwfc 'file', startingpot 'atomic'); rho and tau are rebuilt from them by
+# sum_band with occupations from the source run's eigenvalues at tot_magnetization of this point; the hook starts directly; same
 # settings as the FSM job (80/320 Ry, 8^3 k, Gaussian 0.02, beta 0.3, conv_thr 1e-8, 8 ranks, one pool, --fsm-parts). The
 # failed cold record is kept (record_attempt1.json, summarized in the new record). Inside a 1-node allocation:
-#   bash scripts/perlmutter/job_fe_fsm_warm.sh <FSM run dir> <case> <functional> <source case> "<label>"
+#   bash scripts/perlmutter/job_fe_fsm_warm.sh <FSM run dir> <case> <functional> <source case> "<label>" <wavefunctions|files>
 set -uo pipefail
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 source "$REPO/scripts/perlmutter/env_xcsb.sh"
 export PYTHONPATH="$REPO/src${PYTHONPATH:+:$PYTHONPATH}"
-RUN=${1:?FSM run dir}; CASE=${2:?case}; F=${3:?functional}; SRC=${4:?source case}; LABEL=${5:?label}
+RUN=${1:?FSM run dir}; CASE=${2:?case}; F=${3:?functional}; SRC=${4:?source case}; LABEL=${5:?label}; MODE=${6:?mode}
 cd "$REPO"
 SUM="$RUN/summary_warm.txt"
 python -c "import os, xcsb, sys; sys.exit(0 if os.path.abspath(xcsb.__file__).startswith('$REPO/') else 1)" \
@@ -18,10 +20,13 @@ echo "job ${SLURM_JOB_ID:-nojob} $(git rev-parse HEAD) $CASE $F from $SRC ($LABE
 export OMP_NUM_THREADS=4 OMP_PLACES=cores OMP_PROC_BIND=close
 t0=$(date +%s)
 timeout 3000 srun -N 1 -n 8 -c 8 --exact --cpu-bind=cores python -m xcsb.cli scf --case "$CASE" --mode hooked --name "$F" \
-    --root "$RUN" --fsm-parts --warm-from "$RUN/${SRC}__hooked__$SAFE" --warm-label "$LABEL" > "$RUN/${CASE}__${SAFE}__warm.log" 2>&1
-echo "$CASE $F warm rc=$? $(( $(date +%s) - t0 ))s" >> "$SUM"
+    --root "$RUN" --fsm-parts --warm-from "$RUN/${SRC}__hooked__$SAFE" --warm-label "$LABEL" --warm-mode "$MODE" > "$RUN/${CASE}__${SAFE}__warm_$MODE.log" 2>&1
+echo "$CASE $F warm ($MODE) rc=$? $(( $(date +%s) - t0 ))s" >> "$SUM"
 python - "$RUN/${CASE}__hooked__$SAFE/record.json" >> "$SUM" 2>&1 <<'PY'
-import json, sys
+import json, os, sys
+if not os.path.exists(sys.argv[1]):
+    print("no record.json: the run failed before the hook started (see the warm log; the earlier record is record_attempt<n>.json)")
+    sys.exit(0)
 r = json.load(open(sys.argv[1]))
 h = r.get("history", [])
 print(f"status {r.get('status')} start {r.get('start')!r} iterations {len(h)} E {r.get('energies_ry', {}).get('etot')} "

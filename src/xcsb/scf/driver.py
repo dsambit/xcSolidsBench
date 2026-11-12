@@ -102,10 +102,14 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
     seeds: optional ripple-seeded restarts after convergence (xcsb.studies.m1_ladder.SeedPlan): each seed overwrites QE's
     (rho, tau) with the seeded fields built from the converged ones and re-converges in the same session (QE's orbitals as
     the start, the Broyden history kept); results in rec["ripple"]. The record of the unseeded SCF is complete before.
-    warm_start: optional {"from": a converged run directory, "label": text}: a production restart (user-approved per point, never
-    a robustness test): that run's QE outdir (wavefunctions, rho, tau) is copied and read by QE (startingwfc and startingpot
-    'file'), and the hook starts directly from it (no carrier phase). previous_attempts: earlier failed records of this point,
-    kept in rec["previous_attempts"]."""
+    warm_start: optional {"from": a converged run directory, "label": text, "mode": "wavefunctions" | "files"}: a production
+    restart (user-approved per point, never a robustness test) from that run's QE outdir (copied), and the hook starts directly
+    (no carrier phase). "files": QE reads wavefunctions, rho and tau (startingwfc, startingpot 'file'; failed for Fe FSM 2.8:
+    the read-back density was negative at 1722 points). "wavefunctions": QE reads only the wavefunctions (startingwfc 'file',
+    startingpot 'atomic'), and rho, tau are then rebuilt from them by QE's sum_band with occupations from the source run's
+    eigenvalues (its record) at this run's constraint (QESession.density_from_orbitals): non-negative by construction; the
+    atomic starting density QE builds is overwritten before the first hook step. previous_attempts: earlier failed records
+    of this point, kept in rec["previous_attempts"]."""
     t0 = time.time()
     rank = comm.Get_rank()
     f = get_functional(functional_name)
@@ -127,10 +131,15 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
                 shutil.rmtree(dst)
             shutil.copytree(os.path.join(warm_start["from"], "out"), dst)
         comm.Barrier()
-        warm = {"label": warm_start["label"], "from": os.path.abspath(warm_start["from"]),
+        if warm_start.get("mode") not in ("wavefunctions", "files"):
+            raise ValueError(f"warm start mode {warm_start.get('mode')!r}: 'wavefunctions' or 'files'")
+        warm = {"label": warm_start["label"], "mode": warm_start["mode"], "from": os.path.abspath(warm_start["from"]),
                 "source": {"etot_ry": src_rec["energies_ry"]["etot"], "magnetization": src_rec["magnetization"],
                            "case": src_rec["case"], "xcsb_commit": src_rec["provenance"].get("xcsb_commit")}}
-    s = QESession(case, settings.CARRIER_DFT, workdir, comm, iterative=True, npool=npool, restart=warm is not None)
+    s = QESession(case, settings.CARRIER_DFT, workdir, comm, iterative=True, npool=npool,
+                  restart="" if warm is None else warm["mode"])
+    if warm is not None and warm["mode"] == "wavefunctions":
+        s.density_from_orbitals(src_rec["eigenvalues_ry"], src_rec["kweights"])
     if warm is None:
         carrier = {"history": []}
         tc = time.time()

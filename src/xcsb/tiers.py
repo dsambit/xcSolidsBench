@@ -95,7 +95,7 @@ def get_case(name):
 def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None = None, payback_diag: bool = False,
         maxiter: int | None = None, mixing_beta: float | None = None, mag_split: bool = False, fsm_parts: bool = False,
         npool: int = 1, ripple: str | None = None, m1_diag: bool = False, warm_from: str | None = None,
-        warm_label: str | None = None):
+        warm_label: str | None = None, warm_mode: str | None = None):
     """mode 'native': QE's input_dft = name (host_check: a libxc name for the host E_xc of the native density);
     mode 'hooked': the functional `name` through the hooks. Writes <out>/record.json."""
     from mpi4py import MPI
@@ -153,7 +153,7 @@ def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None =
             if warm_from:
                 if not warm_label:
                     raise ValueError("a warm start needs its label (e.g. 'warm start from m = 2.6')")
-                warm = {"from": warm_from, "label": warm_label}
+                warm = {"from": warm_from, "label": warm_label, "mode": warm_mode}
                 previous = keep_previous_attempts(out, comm)
             rec = run_hooked(case, name, out, comm, record_path=rec_path, post=post, deviations=deviations, npool=npool,
                              seeds=seeds, warm_start=warm, previous_attempts=previous, **kw)

@@ -64,7 +64,7 @@ class Case:
 
 
 def pw_input(case: Case, input_dft: str, pseudo_dir: str, outdir: str, prefix: str, maxiter: int = settings.MAXITER,
-             restart: bool = False) -> str:
+             restart: str = "") -> str:
     """The pw.x input text. No forces, no stress (not provided by the host)."""
     s = case.structure
     for el in sorted(set(s.elements.values())):
@@ -93,7 +93,7 @@ def pw_input(case: Case, input_dft: str, pseudo_dir: str, outdir: str, prefix: s
              f"  electron_maxstep = {maxiter}",
              *(["  diago_full_acc = .true."] if case.diago_full_acc else []),
              f"  startingwfc = '{'file' if restart else settings.STARTINGWFC}'",
-             f"  startingpot = '{'file' if restart else 'atomic'}'", "/",
+             f"  startingpot = '{'file' if restart == 'files' else 'atomic'}'", "/",
              "ATOMIC_SPECIES"]
     for lab in s.species:
         lines.append(f"  {lab} 1.0 {man['files'][s.elements[lab]]['file']}")     # the mass is unused in an SCF
@@ -113,9 +113,11 @@ class QESession:
     """One QEpy Driver (only one can exist per process) and the host-side grid bookkeeping."""
 
     def __init__(self, case: Case, input_dft: str, workdir: str, comm, iterative: bool, pseudo_dir: str | None = None,
-                 outdir: str | None = None, restart: bool = False, npool: int = 1):
+                 outdir: str | None = None, restart: str = "", npool: int = 1):
         import qepy
         from qepy.driver import Driver
+        if restart not in ("", "files", "wavefunctions"):
+            raise ValueError(f"restart {restart!r}: '' (cold), 'files' (wavefunctions, rho, tau) or 'wavefunctions'")
         self.case, self.comm, self.input_dft = case, comm, input_dft
         if npool < 1 or comm.Get_size() % npool:
             raise ValueError(f"npool {npool} must divide the rank count {comm.Get_size()}")
@@ -224,6 +226,26 @@ class QESession:
             raise RuntimeError("eigenvalues: QE's k list is pool-local; only with npool = 1")
         w = self.driver.qepy_pw.wvfct
         return np.asarray(w.get_array_et()).copy(), np.asarray(self.driver.qepy_pw.klist.get_array_wk()).copy()
+
+    def density_from_orbitals(self, et_ry, kweights):
+        """rho, tau := sum_band of QE's current orbitals (startingwfc 'file') with occupations from the given eigenvalues
+        (nbnd, nkstot) Ry, the source run's: QE does not read eigenvalues with the wavefunctions. The k list must be the
+        source's (checked through the weights). Occupations in [0, 1] (Gaussian smearing; tot_magnetization: two Fermi levels),
+        so rho_s >= 0 and tau_s >= tau_W,s by construction. One pool only."""
+        if self.npool != 1:
+            raise RuntimeError("density_from_orbitals: one pool only")
+        w = self.driver.qepy_pw.wvfct
+        et = w.get_array_et()
+        et_ry = np.asarray(et_ry, dtype=float)
+        n = et_ry.shape[1]                                 # nkstot; QE's wk array has the fixed length npk
+        kweights = np.asarray(kweights, dtype=float)[:n]
+        wk = np.asarray(self.driver.qepy_pw.klist.get_array_wk())[:n]
+        if et.shape != et_ry.shape or kweights.shape != wk.shape or not np.allclose(wk, kweights, rtol=0, atol=1e-12):
+            raise RuntimeError(f"density_from_orbitals: QE et {et.shape} / k weights differ from the source {et_ry.shape}")
+        w.set_array_et(et_ry)
+        if not np.array_equal(w.get_array_et(), et_ry):
+            raise RuntimeError("density_from_orbitals: setting QE's eigenvalues failed")
+        self.driver.qepy_pw.qepy_mod.qepy_calc_density()
 
     def kpoints_frac(self):
         """The irreducible k points in crystal coordinates (fractions of the reciprocal vectors), (nks, 3); one pool only."""
