@@ -76,3 +76,21 @@ def test_e1_sc_tasks():
     from xcsb.studies import r2scan_sb as S
     tt = [x for x in S.tasks("/r") if x["stage"] == "T"]
     assert len(tt) == 6 and {x["functional"] for x in tt} == {"r2SCAN-SB", "r2SCAN-SB-kin"}
+
+
+def test_m_of_omega(tmp_path, monkeypatch):
+    from xcsb.studies import fe_e1_sc as E
+    run = str(tmp_path)
+    ms = {10: 2.30, 30: 2.40, 60: 2.50, 90: 2.55, 150: 2.62, 300: 2.68}
+    from xcsb.tiers import run_dir
+    for s in E.SETS:
+        for w, m in ms.items():
+            d = run_dir(run, E.CASE, "hooked", f"{s}+E1(omega={w:g})")
+            os.makedirs(d, exist_ok=True)
+            json.dump({"status": "ok", "magnetization": {"total": -m, "absolute": m + 0.3}, "energies_ry": {"etot": -1.0},
+                       "iterations": 9, "carrier": {"iterations": 9}, "post": {}}, open(os.path.join(d, "record.json"), "w"))
+    r = E.m_of_omega(run, target=2.45)
+    a = r["sets"]["SCH-SI-A:v3.1"]
+    assert a["monotone"] and 30 < a["omega_at_target"] < 60 and 10 < a["omega_at_pbe"] < 30
+    assert E.m_of_omega(run, target=None)["sets"]["SCH-SI-B:v3.1"]["omega_at_target"] is None
+    assert E.TARGET_MOMENT == 2.22 and E.m_of_omega(run)["target"] == 2.22

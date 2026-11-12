@@ -21,8 +21,16 @@ def names():
     return out
 
 
+SCAN_OMEGAS = (60.0, 90.0, 150.0, 300.0)      # stage S (user go 2026-11-12): the SC omega scan of E1 (half, the model form)
+
+
+def scan_names():
+    return [f"{s}+E1(omega={w:g})" for s in SETS for w in SCAN_OMEGAS]
+
+
 def tasks(run):
-    return [{"id": f"E__{f}", "case": CASE, "functional": f, "width": 1, "stage": "E", "est_s": 900.0} for f in names()]
+    return ([{"id": f"E__{f}", "case": CASE, "functional": f, "width": 1, "stage": "E", "est_s": 900.0} for f in names()]
+            + [{"id": f"S__{f}", "case": CASE, "functional": f, "width": 1, "stage": "S", "est_s": 900.0} for f in scan_names()])
 
 
 def record(run, task):
@@ -48,7 +56,11 @@ def command(run, task):
 
 def table(run):
     out = {}
+    seen = set()
     for t in tasks(run):
+        if t["functional"] in seen:
+            continue
+        seen.add(t["functional"])
         r = record(run, t)
         if r is None or r.get("status") != "ok":
             out[t["functional"]] = {"status": None if r is None else r.get("status"), "error": None if r is None else r.get("error")}
@@ -63,4 +75,47 @@ def table(run):
                                 "retained_3d": (e1.get("gate_3d") or {}).get("retained"),
                                 "retained_all": (e1.get("gate_all") or {}).get("retained"),
                                 "w_x_up": mw.get("w_x_up"), "w_x_dn": mw.get("w_x_dn"), "w_c": mw.get("w_c")}
+    return out
+
+
+PBE_REF = 2.359          # our PBE Fe moment at these settings (r2SCAN-SB run, SB-Fe PBE): a reference column only
+# the omega-fit TARGET (user decision 2026-11-12): 2.22 mu_B, the experimental TOTAL moment of bcc Fe (spin + orbital);
+# "user-provided experimental total moment; no archive source read by us". Our moments are SPIN moments (collinear, no SOC):
+# the fit compares a spin moment to a total moment, by the user's choice; it also absorbs our SG15 (no NLCC) offset.
+TARGET_MOMENT = 2.22
+TARGET_NOTE = ("user-provided experimental total moment (spin + orbital) of bcc Fe; no archive source read by us; compared with "
+               "our spin moment (collinear, no SOC) by the user's choice")
+
+
+def m_of_omega(run, target=TARGET_MOMENT, pbe=PBE_REF):
+    """Per set: |m|(omega) of the SC half-form E1 runs (stages E and S), and log-omega interpolation to the target (the
+    EXPERIMENTAL spin moment, a parameter: None until the user provides a sourced value) and to our PBE moment (reference).
+    A crossing is reported only where m(omega) is monotone between the bracketing points."""
+    import math
+    import re
+    t = table(run)
+    out = {"target": target, "target_note": TARGET_NOTE if target == TARGET_MOMENT else "explicit", "pbe_reference": pbe,
+           "sets": {}}
+    for s in SETS:
+        pts = []
+        for f, v in t.items():
+            m = re.fullmatch(re.escape(s) + r"\+E1\(omega=([0-9.eE+-]+)\)", f)
+            if m and v.get("status") == "ok":
+                pts.append((float(m.group(1)), abs(v["m"])))
+        pts.sort()
+        r = {"points": pts}
+        for key, val in (("target", target), ("pbe", pbe)):
+            if val is None:
+                r[f"omega_at_{key}"] = None
+                continue
+            hit = None
+            for (w0, m0), (w1, m1) in zip(pts[:-1], pts[1:]):
+                if (m0 - val) * (m1 - val) <= 0 and m0 != m1:
+                    x = (val - m0) / (m1 - m0)
+                    hit = math.exp(math.log(w0) + x * (math.log(w1) - math.log(w0)))
+                    break
+            r[f"omega_at_{key}"] = hit
+        ms = [m for _, m in pts]
+        r["monotone"] = all(a <= b for a, b in zip(ms[:-1], ms[1:])) or all(a >= b for a, b in zip(ms[:-1], ms[1:]))
+        out["sets"][s] = r
     return out

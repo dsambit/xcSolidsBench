@@ -676,6 +676,11 @@ records (sha256 checked), plus explore/spin_balance (the E1 reference function).
   item 2 ran with kin as its default and half as a labelled row, before this decision.) SC E1 job (job_e1_sc.sh,
   `xcsb.studies.fe_e1_sc`, run dir $W/runs/xcsb/v4_2026-11-12_fe_e1_sc): installed A/B at 2.858 Å and A/B + E1 / E1kin at ω 10,
   30 (FD phase 0 at ω 10), with r2SCAN-SB / -kin at ω 10 for Ni (β 0.1 start) and the Fe points m = 2.2, 2.4, 2.6.
+  SC ω scan (user go 2026-11-12; job_e1_scan.sh, stage S of `fe_e1_sc`, same run dir): A/B + E1 (half) at ω 60, 90, 150, 300,
+  combined with ω 10, 30 into |m|(ω); ω* by log-ω interpolation to the TARGET 2.22 μB (user decision 2026-11-12: the experimental
+  TOTAL moment of bcc Fe, user-provided, no archive source read by us; our moments are spin moments, collinear without SOC, so the
+  fit compares a spin moment with a total moment by the user's choice, and it absorbs the SG15 no-NLCC offset of our absolute
+  moments), with our PBE 2.359 μB as a reference column. This supersedes the earlier fit target (our PBE at 2.858 Å).
 
 ### 6.11 v4: AFM NiO and MnO gaps (user 2026-11-11; staged: `xcsb.studies.tmo_gap`, `job_tmo_gap.sh`)
 
