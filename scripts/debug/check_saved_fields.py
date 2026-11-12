@@ -15,13 +15,14 @@ from xcsb.host.qe_files import saved_spin_fields
 
 def main(d, exc=True):
     r = json.load(open(os.path.join(d, "record.json")))
-    rho, tau, shape = saved_spin_fields(d)
+    info = {}
+    rho, tau, shape = saved_spin_fields(d, info=info)
     lat = np.asarray(r["case"]["structure"]["lattice_bohr"])
     g = SpectralGrid(lat, shape, r["case"]["ecutrho"])
     out = {"dir": os.path.basename(d), "shape": shape, "n_el_saved": [g.integrate(rho[s]) for s in range(2)],
            "n_el_record": r.get("density_stats", {}).get("n_electrons"), "min_rho_saved": [float(rho[s].min()) for s in range(2)],
            "min_rho_record": r.get("density_stats", {}).get("min_rho"), "m_saved": g.integrate(rho[0] - rho[1]),
-           "m_record": r["magnetization"]["total"]}
+           "m_record": r["magnetization"]["total"], "rel_imag": info.get("rel_imag")}
     if exc:
         f = get(r["functional"])
         res = evaluate_on_grid(f, g, rho, tau)
