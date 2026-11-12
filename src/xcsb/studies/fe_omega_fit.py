@@ -1,7 +1,7 @@
 """Fit of the E1 gate width omega to the bcc Fe moment (user decision 2026-11-11; strongxc-v4 rules/implementation.md exception
 92b1cfb56), per set A and B, self-consistently. Co and Ni stay hold-outs (never evaluated here).
 
-Settings (identical for the target and the fit): SB-Fe of xcsb.studies.r2scan_sb: bcc Fe, static a 2.858 A, nspin 2, FM start,
+xchole line v4-e1 (strongxc-v4 76cfa7c20). Settings (identical for the target and the fit; target confirmed by the user 2026-11-11): SB-Fe of xcsb.studies.r2scan_sb: bcc Fe, static a 2.858 A, nspin 2, FM start,
 80/320 Ry, 8^3 k, Gaussian 0.02 Ry, conv_thr 1e-8, beta 0.3, cold carrier start. TARGET: our own PBE moment at these settings,
 read from the PBE record of the r2SCAN-SB run (TARGET_RUN; that job computes it once); the pseudopotential offset cancels.
 (The FSM free PBE run, 2.381 mu_B, used a = 2.866 A: not the same settings.)
@@ -34,7 +34,7 @@ FROZEN = os.environ.get("XCSB_SB_FROZEN", "/pscratch/sd/d/dsambit/xc_functional_
 
 
 def fname(s, w):
-    return f"{s}+E1@omega={w:.6g}"
+    return f"{s}+E1(omega={w:.6g})"
 
 
 def target():

@@ -278,7 +278,7 @@ if __name__ == "__main__":
 
 
 def e1_parts(functional_name, grid, rho, tau):
-    """Post diagnostic of an SCF run with the E1 term ('SCH-SI-X:v3.1+E1@omega=w'): on its converged density, E_x, E_c^SI, the
+    """Post diagnostic of an SCF run with the E1 term ('SCH-SI-X:v3.1+E1(omega=w)'): on its converged density, E_x, E_c^SI, the
     term Delta E (Ry) and the gate diagnostics overall and in the 3d region (sb_model.e_xc_points at the run's omega)."""
     from ..functional.xchole import parse_e1
     from ..host.evaluate import point_inputs
@@ -309,8 +309,8 @@ def e1_parts(functional_name, grid, rho, tau):
 def sb_module_any():
     """sb_model from the pinned tree of the v4 or v4-sb line."""
     from ..functional.xchole import XCHOLE_LINE, import_pinned_xchole
-    if XCHOLE_LINE not in ("v4", "v4-sb"):
-        raise RuntimeError("sb_model needs XCSB_XCHOLE_LINE v4 or v4-sb")
+    if XCHOLE_LINE not in ("v4", "v4-sb", "v4-e1"):
+        raise RuntimeError("sb_model needs XCSB_XCHOLE_LINE v4, v4-sb or v4-e1")
     _, commit = import_pinned_xchole()
     root = os.path.dirname(os.path.abspath(os.environ["XCSB_XCHOLE_SRC"]))
     if os.path.join(root, "explore", "spin_balance") not in sys.path:

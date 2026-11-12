@@ -1,7 +1,8 @@
 #!/bin/bash
 # Launch ONE 1-node interactive allocation (m2360) of the self-consistent spin-balanced r2SCAN test ('sb', 2 h) or of the E1
 # omega fit to our PBE Fe moment ('fit', 1.5 h; after 'sb' and the frozen job); self-terminating.
-# Needs the xchole clone $W/src/xchole-v4sb at the spin-balance agent's commit (the pin XCHOLE_PINS['v4-sb'] of this commit).
+# The xchole clone $W/src/xchole-<line> is checked out at the pin XCHOLE_PINS[<line>] of this commit (sb: v4-sb b2501727c;
+# fit: v4-e1 76cfa7c20).
 # Login node:  nohup bash <any clone>/scripts/perlmutter/launch_r2scan_sb.sh sb  > $W/runs/xcsb/v4_2026-11-12_r2scan_sb/launch_1.log 2>&1 &
 #              nohup bash <any clone>/scripts/perlmutter/launch_r2scan_sb.sh fit > $W/runs/xcsb/v4_2026-11-12_fe_omega_fit/launch_1.log 2>&1 &
 # Refuses to start while the user has >= 2 jobs queued or running (all workstreams); salloc retried (12 x 5 min) only when an
@@ -9,17 +10,17 @@
 W=/pscratch/sd/d/dsambit/xc_functional_dev
 WHAT=${1:-sb}                                    # sb: the r2SCAN-SB SCF test; fit: the E1 omega fit (after sb and the frozen job)
 case $WHAT in
-  sb)  RUN=$W/runs/xcsb/v4_2026-11-12_r2scan_sb; JOBS=job_r2scan_sb.sh; T=02:00:00; AS=7200;;
-  fit) RUN=$W/runs/xcsb/v4_2026-11-12_fe_omega_fit; JOBS=job_fe_omega_fit.sh; T=01:30:00; AS=5400;;
+  sb)  RUN=$W/runs/xcsb/v4_2026-11-12_r2scan_sb; JOBS=job_r2scan_sb.sh; T=02:00:00; AS=7200; LINE=v4-sb;;
+  fit) RUN=$W/runs/xcsb/v4_2026-11-12_fe_omega_fit; JOBS=job_fe_omega_fit.sh; T=01:30:00; AS=5400; LINE=v4-e1;;
   *) echo "sb or fit" >&2; exit 2;;
 esac
 mkdir -p "$RUN"
 C=$(git -C $W/xcSolidsBench.git rev-parse main)
 REPO=$W/src/xcSolidsBench-sb-${C:0:8}
 if [ ! -d "$REPO" ]; then git clone -q $W/xcSolidsBench.git "$REPO" && git -C "$REPO" checkout -q "$C"; fi
-PIN=$(cd "$REPO" && python3 -c "import re; s = open('src/xcsb/functional/xchole.py').read(); m = re.search(r'\"v4-sb\": \"([0-9a-f]{40})\"', s); print(m.group(1) if m else '')")
-[ -n "$PIN" ] || { echo "the v4-sb pin is not set in $C (waiting for the spin-balance functional)" | tee -a "$RUN/launch_tries.txt"; exit 1; }
-X=$W/src/xchole-v4sb
+PIN=$(cd "$REPO" && python3 -c "import re; s = open('src/xcsb/functional/xchole.py').read(); m = re.search(r'\"$LINE\": \"([0-9a-f]{40})\"', s); print(m.group(1) if m else '')")
+[ -n "$PIN" ] || { echo "the $LINE pin is not set in $C" | tee -a "$RUN/launch_tries.txt"; exit 1; }
+X=$W/src/xchole-$LINE
 if [ ! -d "$X" ]; then git clone -q $W/xcHoleModelMeta.git "$X"; fi
 git -C "$X" fetch -q origin 2>/dev/null; git -C "$X" checkout -q "$PIN" || { echo "cannot check out $PIN in $X"; exit 1; }
 [ -f "$X/explore/spin_balance/sb_r2scan.py" ] || { echo "no sb_r2scan.py at $PIN"; exit 1; }

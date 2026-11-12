@@ -7,7 +7,7 @@ set -uo pipefail
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 source "$REPO/scripts/perlmutter/env_xcsb.sh"
 source "$REPO/scripts/perlmutter/env_xcsb_v4.sh"
-export XCSB_XCHOLE_SRC=$W/src/xchole-v4sb/src XCSB_XCHOLE_LINE=v4-sb
+export XCSB_XCHOLE_SRC=$W/src/xchole-v4-sb/src XCSB_XCHOLE_LINE=v4-sb
 export PYTHONPATH="$REPO/src${PYTHONPATH:+:$PYTHONPATH}"
 RUN=${1:?run dir}
 mkdir -p "$RUN"

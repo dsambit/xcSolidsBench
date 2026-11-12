@@ -637,7 +637,9 @@ records (sha256 checked), plus explore/spin_balance (the E1 reference function).
   settings (static 2.858 Å, 80/320 Ry, 8³ k, Gaussian 0.02, FM start, cold carrier start); target = our PBE moment at THESE
   settings (the r2SCAN-SB job's PBE Fe record; the FSM free PBE 2.381 μB was at 2.866 Å). Bracket from the frozen ω scan; 3 SC
   points (bracket ends and geometric mean); ω* by interpolation in log ω; the H-atom check of the term at ω* (|ΔE| ≤ 1e-6 Ha);
-  a confirming SC run at ω* with the E1 parts. STOP rules: no bracket, a bracket below ω 10, m(ω) not monotone or not reaching
+  a confirming SC run at ω* with the E1 parts. Functional names 'SCH-SI-A:v3.1+E1(omega=<w>)', 'SCH-SI-B:v3.1+E1(omega=<w>)' (ω in
+  the provenance); xchole line v4-e1 = strongxc-v4 76cfa7c20 (the E1 SCF path verified there; code identical to b2501727c); the
+  target (PBE at 2.858 Å from the r2SCAN-SB job) confirmed by the user 2026-11-11. STOP rules: no bracket, a bracket below ω 10, m(ω) not monotone or not reaching
   the target, the H check failing. Co and Ni stay hold-outs.
 
 ## 7. Verification tiers

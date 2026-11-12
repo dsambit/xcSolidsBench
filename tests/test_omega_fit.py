@@ -58,6 +58,9 @@ def test_plan_and_omega_star(tmp_path, monkeypatch):
 def test_h_inputs_and_names():
     d, w = F.h_atom_inputs()
     assert abs(w @ d[0] - 1.0) < 1e-4 and np.all(d[1] == 0)
-    assert parse_e1("SCH-SI-A:v3.1+E1@omega=30") == ("SCH-SI-A:v3.1", 30.0)
+    assert parse_e1("SCH-SI-A:v3.1+E1(omega=30)") == ("SCH-SI-A:v3.1", 30.0)
+    assert parse_e1(F.fname("SCH-SI-B:v3.1", 51.96152422706632)) == ("SCH-SI-B:v3.1", 51.9615)
     with pytest.raises(ValueError):
-        parse_e1("SCH-SI-A:v3.1+E1@omega=0")
+        parse_e1("SCH-SI-A:v3.1+E1(omega=0)")
+    with pytest.raises(KeyError):
+        parse_e1("SCH-SI-A:v3.1+E1@omega=30")

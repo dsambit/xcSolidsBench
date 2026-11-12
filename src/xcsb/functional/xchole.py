@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import subprocess
 import sys
 
@@ -34,6 +35,10 @@ XCHOLE_PINS = {                                              # line -> pinned xc
     # explore/xc_pairing differs only in a path of the unused driver xp_eval.py, sb_model.py identical to dd8b5a517, records
     # byte-identical
     "v4-sb": "b2501727cb47e464164a8a722235922be0a1bf2b",
+    # strongxc-v4 76cfa7c20 (the spin-balance agent, 2026-11-11): the E1 SCF path verified there (sb_model.install before
+    # build_model: energies to 9e-16, gradients bitwise); src/xchole/sch_si, core, ueg_gauge, benchmarks, explore/xc_pairing and
+    # explore/spin_balance/sb_model.py identical to b2501727c, records byte-identical. For every SCF with E1 (the omega fit).
+    "v4-e1": "76cfa7c209607a8eab2a127d0ee746ceadd6dd8d",
 }
 XCHOLE_LINE = os.environ.get("XCSB_XCHOLE_LINE", "v3.1")
 if XCHOLE_LINE not in XCHOLE_PINS:
@@ -266,33 +271,32 @@ E1_SPEC = {"ref": "ueg_end", "placement": "base", "r0_form": "kin"}      # E1 as
 
 
 def parse_e1(name: str):
-    """'SCH-SI-A:v3.1+E1@omega=30' -> ('SCH-SI-A:v3.1', 30.0)."""
-    base, rest = name.split("+E1")
-    if not rest.startswith("@omega="):
-        raise KeyError(f"{name!r}: expected '<set>+E1@omega=<value>'")
-    w = float(rest[len("@omega="):])
+    """'SCH-SI-A:v3.1+E1(omega=30)' -> ('SCH-SI-A:v3.1', 30.0)."""
+    m = re.fullmatch(r"(SCH-SI-[AB]:v3\.1)\+E1\(omega=([0-9.eE+-]+)\)", name)
+    if not m:
+        raise KeyError(f"{name!r}: expected '<set>+E1(omega=<value>)'")
+    w = float(m.group(2))
     if not w > 0:
         raise ValueError(f"{name}: omega must be > 0 (omega = 0 is excluded: it loses the one-electron limit)")
-    return base, w
+    return m.group(1), w
 
 
 class XcholeE1(XcholeFunctional):
     """A v3.1 set with the v4 spin-balance correlation term E1 (UEG-gauge reference, base placement, R0 kin) at gate width omega:
     strongxc-v4 explore/spin_balance/sb_model.install wraps jax_si.exc_si in THIS process before the model is built, so the
-    model's jitted energy and exact JAX derivatives carry the term (one SCF per process). Lines v4 and v4-sb (sb_model present)."""
+    model's jitted energy and exact JAX derivatives carry the term. omega is fixed at the model's first trace: each construction
+    installs again and builds its own model (models built earlier keep theirs). Line v4-e1 (strongxc-v4 76cfa7c20, where this
+    path is verified)."""
 
     def __init__(self, name: str):
         base, w = parse_e1(name)
-        if XCHOLE_LINE not in ("v4", "v4-sb"):
-            raise RuntimeError(f"{name}: needs the xchole line v4 or v4-sb (sb_model), now {XCHOLE_LINE}")
+        if XCHOLE_LINE != "v4-e1":
+            raise RuntimeError(f"{name}: needs the xchole line v4-e1 (strongxc-v4 76cfa7c20), now {XCHOLE_LINE}")
         import_pinned_xchole()
         root = os.path.dirname(os.path.abspath(os.environ["XCSB_XCHOLE_SRC"]))
         sys.path.insert(0, os.path.join(root, "explore", "spin_balance"))
         import sb_model
-        if getattr(sb_model, "_XCSB_INSTALLED", None) not in (None, (w,)):
-            raise RuntimeError(f"E1 already installed in this process with {sb_model._XCSB_INSTALLED} (one SCF per process)")
-        sb_model.install(E1_SPEC["ref"], w, E1_SPEC["placement"], E1_SPEC["r0_form"])
-        sb_model._XCSB_INSTALLED = (w,)
+        sb_model.install(E1_SPEC["ref"], w, E1_SPEC["placement"], E1_SPEC["r0_form"])      # before the model is built
         super().__init__(base)
         self.name = name
         self._prov.update(kind="xchole + E1 (v4 spin balance)", e1=dict(E1_SPEC, omega=w, module="explore/spin_balance/sb_model.py",
