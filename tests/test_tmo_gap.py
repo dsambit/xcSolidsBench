@@ -64,7 +64,10 @@ def test_site_moments(lattice):
             c = (np.asarray(f0) + np.array(sh)) @ s.lattice
             gss = 0.02 * np.exp(-np.sum((r - c[:, None, None, None]) ** 2, axis=0))
             rho[0 if sgn > 0 else 1] += gss
-    m = T.site_moments(g, rho, s)["moments"]
+    sm = T.site_moments(g, rho, s)
+    m = sm["moments"]
+    br = sm["by_radius"]
+    assert set(br) == {"1.6", "2", "2.4"} and br["1.6"]["Ni1"] < br["2"]["Ni1"] < br["2.4"]["Ni1"] and br["2"]["Ni1"] == m["Ni1"]
     assert set(m) == {"Ni1", "Ni2"} and m["Ni1"] > 0 and m["Ni2"] < 0 and abs(m["Ni1"] + m["Ni2"]) < 1e-3 * abs(m["Ni1"])
 
 

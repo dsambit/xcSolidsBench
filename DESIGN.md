@@ -671,6 +671,13 @@ the term and its potential vanish at spin-symmetric states, so only magnetic ins
 - References (archive `solids/tmo_expt_r2scan_swathilakshmi2023_tableS2`, SI Table S2 read, original references not read):
   experimental MnO 3.60-3.80 eV, 4.580 μB; NiO 4.30 eV, ±1.64-1.90 μB (gap type not stated in the SI); their r2SCAN (external,
   different PP/code) MnO 1.45 eV, 4.446 μB; NiO 2.11 eV, 1.577 μB. No zero-point information.
+- Their protocol (main text Sec. 2.1, read; archive `solids/tmo_protocol_swathilakshmi2023_2026-11-12`): VASP 6.2.1,
+  frozen-core PBE PAW (datasets of their refs 38, 39, names not given), 520 eV; Γ-centred MP at 48 k per Å (48/|a_i| rounded
+  up); relaxations without symmetry; Gaussian 0.05 eV; GAPS from the DOS of a single SCF with zero-weighted k-points at 96 per Å
+  (−20 to 20 eV, 0.005 eV steps); on-site moments with an unstated sphere. Comparability: their gap is a smeared DOS gap on a
+  denser mesh, ours the GKS eigenvalue gap on our SCF mesh with fixed occupations; their moment sphere is unknown, so ours are
+  reported at 1.6, 2.0 and 2.4 bohr. Gap type (optical vs fundamental) of the experimental values: stated in neither the main text
+  nor the SI (open).
 - Cost (scaled from Fe80, uncertain): about 50 min per SCF at 100 Ry, level 4, quarter node (AFM ~100 iterations); level 8 on a
   full node ~1-2 h; stages P+G ≈ 2 allocations, stage F ≈ 1-2 allocations of 4 h (batch would fit better).
 

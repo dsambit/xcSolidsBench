@@ -18,8 +18,14 @@ k level n: the mesh n x K_RATIO (NiO (n, n/2, n), MnO (n, n, n/2): the cells' ve
 Stage F: all four functionals at the selected settings (SETTINGS.json).
 
 Reported per functional: the GKS gap (minimum over the SCF mesh: min CBM - max VBM over both spins, with the k points and spins
-of the edges), the TM site moments (the integral of rho_up - rho_dn within R_SITE of each TM site, minimum image) and the cell's
-absolute magnetization, SCF iterations."""
+of the edges), the TM site moments (the integral of rho_up - rho_dn within R_SITE of each TM site, minimum image; also at 1.6 and
+2.4 bohr) and the cell's absolute magnetization, SCF iterations.
+
+Comparability with the external reference (Swathilakshmi et al., archive solids/tmo_protocol_swathilakshmi2023_2026-11-12): their
+gap is a DOS gap (VASP, Gaussian 0.05 eV, a single SCF with zero-weighted k-points at 96 per A, DOS in 0.005 eV steps) on a denser
+mesh; ours is the GKS eigenvalue gap on our SCF mesh with fixed occupations (no smearing). Their moment sphere is not stated
+(presumably VASP's default RWIGS, not sourced); ours are reported at three radii. Different code and pseudopotentials (PAW 520
+eV vs SG15 ONCV): an external cross-check only."""
 from __future__ import annotations
 
 import json
@@ -52,6 +58,7 @@ KMESHES = (4, 6, 8)
 CRIT_MOMENT, CRIT_GAP, CRIT_DE_MEV = 0.01, 0.02, 1.0
 GAP_TOL = 0.02
 R_SITE = 2.0                    # bohr: the TM sphere of the site moments (stated; diagnostic)
+R_SITES = (1.6, 2.0, 2.4)       # bohr: the moments at three radii (VASP's default RWIGS of the reference is not sourced)
 RY_EV = 13.605693122994
 
 
@@ -108,7 +115,8 @@ def gaps(rec, mat):
 
 
 def site_moments(grid, rho, structure):
-    """{label: integral of rho_up - rho_dn within R_SITE of the site} for the TM sites (minimum image)."""
+    """{label: integral of rho_up - rho_dn within R_SITE of the site} for the TM sites (minimum image), and the same at every
+    radius of R_SITES ('by_radius'), so that a comparison is not tied to one sphere."""
     fr = np.stack(np.meshgrid(*[np.arange(n) / n for n in grid.shape], indexing="ij")).reshape(3, -1)
     m = (rho[0] - rho[1]).reshape(-1)
     out = {}
@@ -120,8 +128,9 @@ def site_moments(grid, rho, structure):
         for sh in np.array(np.meshgrid([-1, 0, 1], [-1, 0, 1], [-1, 0, 1], indexing="ij")).reshape(3, -1).T:
             c = (d - np.round(d) + sh[:, None]).T @ grid.lattice
             best = np.minimum(best, np.linalg.norm(c, axis=1))
-        out[lab] = float(grid.weight * m[best <= R_SITE].sum())
-    return {"r_site_bohr": R_SITE, "moments": out}
+        out[lab] = {r: float(grid.weight * m[best <= r].sum()) for r in R_SITES}
+    return {"r_site_bohr": R_SITE, "moments": {k: v[R_SITE] for k, v in out.items()},
+            "by_radius": {f"{r:g}": {k: v[r] for k, v in out.items()} for r in R_SITES}}
 
 
 def post_moments(case_name_):
@@ -146,9 +155,11 @@ def _ok(r):
 
 
 def _row(r, mat):
-    sm = ((r.get("post") or {}).get("tmo") or {}).get("moments", {})
+    tmo = (r.get("post") or {}).get("tmo") or {}
+    sm = tmo.get("moments", {})
     return dict(gaps(r, mat), etot_ry=r["energies_ry"]["etot"], abs_m=r["magnetization"]["absolute"],
-                m_total=r["magnetization"]["total"], site_moments=sm, iterations=r["iterations"],
+                m_total=r["magnetization"]["total"], site_moments=sm, site_moments_by_radius=tmo.get("by_radius"),
+                iterations=r["iterations"],
                 carrier_iterations=r["carrier"]["iterations"], seconds=r.get("seconds"))
 
 
