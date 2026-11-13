@@ -86,6 +86,9 @@ def get_case(name):
     if name.startswith("SB-"):
         from .studies.r2scan_sb import get_case as sb_case
         return sb_case(name)
+    if name.startswith("LC-"):
+        from .studies.ionic_lc import get_case as lc_case
+        return lc_case(name)
     if name.startswith("MgO-"):
         from .studies.mgo_gap import get_case as mgo_case
         return mgo_case(name)

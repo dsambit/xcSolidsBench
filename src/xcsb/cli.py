@@ -5,6 +5,7 @@
     xcsb tier v5 --out DIR                                                                            (under srun)
     xcsb run CASE.toml --functional NAME --out DIR                                                    (under srun)
     xcsb m1 tasks|ec|table --run DIR                                                                  (serial)
+    xcsb lc protocol | tasks|table|bank --run DIR                                                     (serial)
 """
 from __future__ import annotations
 
@@ -61,6 +62,10 @@ def main(argv=None):
     mg = sub.add_parser("mgo", help="MgO band gap: task list, tables, the banked reference record (serial; no QE)")
     mg.add_argument("what", choices=["tasks", "table", "bank", "bank-eos"])
     mg.add_argument("--run", required=True)
+    lc = sub.add_parser("lc", help="ionic-solid lattice constants: protocol, task list, table, the banked reference record "
+                        "(serial; no QE)")
+    lc.add_argument("what", choices=["protocol", "tasks", "table", "bank"])
+    lc.add_argument("--run", help="run directory (not needed for 'protocol')")
     pv = sub.add_parser("prep-variant", help="re-solve and cache the norms of norm-dependent xchole variants (serial)")
     pv.add_argument("names", nargs="+")
     c = sub.add_parser("compare", help="tier verdicts from the SCF records")
@@ -120,6 +125,23 @@ def main(argv=None):
             print(json.dumps(G.bank_eos(a.run), indent=1, default=float))
         else:
             print(json.dumps(G.bank_reference(a.run), indent=1, default=float))
+        return 0
+    if a.cmd == "lc":
+        from .studies import ionic_lc as L
+        if a.what == "protocol":
+            print(json.dumps(L.protocol(), indent=1))
+            return 0
+        if not a.run:
+            p.error("lc tasks|table|bank need --run")
+        if a.what == "tasks":
+            for t in L.tasks(a.run):
+                print(json.dumps(dict(t, done=L.done(a.run, t), failed=L.failed(a.run, t))))
+        elif a.what == "table":
+            res = L.table(a.run)
+            json.dump(res, open(os.path.join(a.run, "lc_table.json"), "w"), indent=1, default=float)
+            print(L.render(res))
+        else:
+            print(json.dumps(L.bank_reference(a.run), indent=1, default=float))
         return 0
     if a.cmd == "compare":
         from . import tiers

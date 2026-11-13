@@ -1,0 +1,51 @@
+{
+ "what": "Rock-salt ionic solids of the LC20 set: reference lattice constants and the collaborator's cross-check values (xcsb.studies.ionic_lc)",
+ "status": "NOT YET BANKED in the archive (refdata): transcribed from the user's message of 2026-11-13; to be banked write-once as a solids/ entry, then this file's 'archive_entry' fields name it",
+ "a_ref_angstrom": {
+  "LiF": 3.972,
+  "LiCl": 5.07,
+  "NaF": 4.582,
+  "NaCl": 5.569,
+  "MgO": 4.189
+ },
+ "a_ref_source": "LC20, ZPAE-corrected experiment; bn-r2SCAN paper SI Table S2, arXiv:2609.09034; same set as Hao et al. 2012; transcribed from the collaborator's LC20.json, branch strongxc-v3-solids commit 21f8d39",
+ "a_ref_archive_entry": null,
+ "ecutwfc_floor_ry": {
+  "Li": 82.0,
+  "F": 96.0,
+  "Na": 96.0,
+  "Cl": 66.0,
+  "Mg": 96.0,
+  "O": 96.0
+ },
+ "ecutwfc_min_ry": 80.0,
+ "protocol_source": "the collaborator's LC20 protocol (user 2026-11-13): ecutwfc = max(80 Ry, per-element floors), ecutrho = 8 ecutwfc, k-spacing 0.1 1/A (VASP convention, reference cell), conv_thr 1e-8 Ry, mixing_beta 0.3, n_occ + 4 bands, a = a_ref (1 + s), s = -3 % ... +3 % in 1 % steps, third-order Birch-Murnaghan",
+ "collaborator": {
+  "source": "collaborator run 2026-11-05, results/solids/2026-11-05_lc20_libxc-{pbe,r2scan}, commit 21f8d39",
+  "note": "the collaborator's own host, same pseudopotentials (SG15 ONCV 1.2) and protocol; a cross-check, not a reference",
+  "archive_entry": null,
+  "a0_angstrom": {
+   "PBE": {
+    "LiF": 4.0622,
+    "LiCl": 5.1516,
+    "NaF": 4.7029,
+    "NaCl": 5.6987,
+    "MgO": 4.2555
+   },
+   "r2SCAN": {
+    "LiF": 3.9934,
+    "LiCl": 5.1208,
+    "NaF": 4.6165,
+    "NaCl": 5.6327,
+    "MgO": 4.2159
+   }
+  },
+  "B0_GPa": {
+   "r2SCAN": {
+    "LiCl": 34.52,
+    "LiF": 76.81,
+    "MgO": 165.72
+   }
+  }
+ }
+}

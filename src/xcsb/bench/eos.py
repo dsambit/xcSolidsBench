@@ -1,6 +1,9 @@
 """Third-order Birch-Murnaghan E(V) fit (DESIGN Sec. 6.3, one EOS form): E = c0 + c1 x + c2 x^2 + c3 x^3 with x = V^(-2/3) (linear
 least squares; exactly the BM3 family), V0 from dE/dV = 0, B0 = V E''(V0), B0' from the third derivative. Raises if V0 lies
-outside the inner two thirds of the scanned volumes or if the rms residual exceeds RMS_TOL (global)."""
+outside the inner two thirds of the scanned volumes or if the rms residual exceeds RMS_TOL (global).
+
+guard=False (scan design and labelled like-for-like comparisons only, e.g. xcsb.studies.ionic_lc): these two conditions are
+returned as the flags v0_inner_two_thirds and rms_ok instead of raising; a fit without a unique minimum still raises."""
 from __future__ import annotations
 
 import numpy as np
@@ -13,7 +16,7 @@ class EOSError(RuntimeError):
     pass
 
 
-def bm3_fit(V, E):
+def bm3_fit(V, E, guard=True):
     V, E = np.asarray(V, float), np.asarray(E, float)
     if len(V) < 5:
         raise EOSError("BM3 fit needs at least 5 points")
@@ -34,9 +37,10 @@ def bm3_fit(V, E):
     x0 = xs[0]
     V0 = x0 ** -1.5
     lo, hi = V.min(), V.max()
-    if not (lo + (hi - lo) / 6 <= V0 <= hi - (hi - lo) / 6):
+    inner = bool(lo + (hi - lo) / 6 <= V0 <= hi - (hi - lo) / 6)
+    if guard and not inner:
         raise EOSError(f"V0 {V0:.4f} outside the inner two thirds of [{lo:.4f}, {hi:.4f}]: a rescan centred at V0 is the user's call")
-    if rms > RMS_TOL_RY:
+    if guard and rms > RMS_TOL_RY:
         raise EOSError(f"BM3 rms residual {rms:.2e} Ry > {RMS_TOL_RY:.0e}")
     # E(V) derivatives through x(V) = V^(-2/3): dx/dV = -2/3 V^(-5/3), d2x/dV2 = 10/9 V^(-8/3), d3x/dV3 = -80/27 V^(-11/3)
     dEx = lambda xx: c[1] + 2 * c[2] * xx + 3 * c[3] * xx ** 2      # noqa: E731
@@ -48,4 +52,5 @@ def bm3_fit(V, E):
     B0p = -1.0 - V0 * E3 / E2
     E0 = float(c @ np.array([1, x0, x0 ** 2, x0 ** 3]))
     return {"V0_bohr3": float(V0), "E0_ry": E0, "B0_GPa": float(B0 * RY_BOHR3_TO_GPA), "B0_prime": float(B0p),
-            "rms_ry": rms, "coeffs": c.tolist(), "n_points": int(len(V))}
+            "rms_ry": rms, "coeffs": c.tolist(), "n_points": int(len(V)), "v0_inner_two_thirds": inner,
+            "rms_ok": bool(rms <= RMS_TOL_RY)}

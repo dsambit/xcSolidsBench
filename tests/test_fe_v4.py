@@ -102,7 +102,7 @@ def test_points_and_curves(tmp_path):
 
 def test_pin_table():
     from xcsb.functional import xchole
-    assert set(xchole.XCHOLE_PINS) == {"v3.1", "v4", "v4-sb", "v4-e1"} and xchole.XCHOLE_PIN == xchole.XCHOLE_PINS[xchole.XCHOLE_LINE]
+    assert set(xchole.XCHOLE_PINS) == {"v3.1", "v4", "v4-sb", "v4-e1", "v3.2"} and xchole.XCHOLE_PIN == xchole.XCHOLE_PINS[xchole.XCHOLE_LINE]
 
 
 def test_lowm_cases():

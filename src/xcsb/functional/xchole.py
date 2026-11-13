@@ -1,6 +1,7 @@
 """Adapter to the user's xchole package (SCH-SI model sets), read-only use (DESIGN.md Sec. 3).
 
-xchole is the source tree of xcHoleModelMeta, branch strongxc-v3, pinned to the v3.1 install commit XCHOLE_PIN. Its `src`
+xchole is the source tree of xcHoleModelMeta, pinned per line (XCSB_XCHOLE_LINE; default v3.1, the v3.1 install commit of
+branch strongxc-v3; line v3.2: the v3.2 sets, which replace v3.1 there) to the commit XCHOLE_PIN. Its `src`
 directory is given by the environment variable XCSB_XCHOLE_SRC and must be a git checkout at the pin (Perlmutter) or an
 export with a file XCHOLE_COMMIT next to `src` that names the pin (laptop: `git archive`, never a worktree of that repo).
 The adapter puts that directory first on sys.path before the first `import xchole`, and raises if xchole was already
@@ -39,6 +40,10 @@ XCHOLE_PINS = {                                              # line -> pinned xc
     # build_model: energies to 9e-16, gradients bitwise); src/xchole/sch_si, core, ueg_gauge, benchmarks, explore/xc_pairing and
     # explore/spin_balance/sb_model.py identical to b2501727c, records byte-identical. For every SCF with E1 (the omega fit).
     "v4-e1": "76cfa7c209607a8eab2a127d0ee746ceadd6dd8d",
+    # strongxc-v3 019c8acd6 (user 2026-11-13, the ionic lattice constants): the v3.2 sets SCH-SI-A:v3.2, SCH-SI-B:v3.2, which
+    # REPLACE v3.1 there (no v3.1 records at this pin; the adapter-facing API params.of_record / candidate_params /
+    # jax_si.ModelXC_SCHSI / jax_sc.sc_dict is unchanged against 0e9e8ee28; no explore/xc_pairing or spin_balance use)
+    "v3.2": "019c8acd65a7ee2d71f59d750338415e73695ec1",
 }
 XCHOLE_LINE = os.environ.get("XCSB_XCHOLE_LINE", "v3.1")
 if XCHOLE_LINE not in XCHOLE_PINS:
@@ -46,10 +51,14 @@ if XCHOLE_LINE not in XCHOLE_PINS:
 XCHOLE_PIN = XCHOLE_PINS[XCHOLE_LINE]
 if XCHOLE_PIN is None:
     raise RuntimeError(f"xchole line {XCHOLE_LINE!r}: pin not set yet (waiting for the commit of the spin-balance functional)")
-RECORD_SHA256 = {                                            # installed records at the pin (src/xchole/sch_si/parameter_sets)
-    "SCH-SI-A:v3.1": ("SCH-SI-A-v3.1.json", "cbd4b9c58bda0b15a6857bd463197c5e3c82da6ec2263a4232a09a9e8974280f"),
-    "SCH-SI-B:v3.1": ("SCH-SI-B-v3.1.json", "5b9d3a24162b78f8314319b13085d46f2da84e5a983096bfe6c1fd217bbda277"),
+RECORDS_BY_VERSION = {                                       # installed records (src/xchole/sch_si/parameter_sets) and sha256
+    "v3.1": {"SCH-SI-A:v3.1": ("SCH-SI-A-v3.1.json", "cbd4b9c58bda0b15a6857bd463197c5e3c82da6ec2263a4232a09a9e8974280f"),
+             "SCH-SI-B:v3.1": ("SCH-SI-B-v3.1.json", "5b9d3a24162b78f8314319b13085d46f2da84e5a983096bfe6c1fd217bbda277")},
+    "v3.2": {"SCH-SI-A:v3.2": ("SCH-SI-A-v3.2.json", "a73d60379feb7d27f4de93447065bad6ea6cc31a811c7bde3c66dd4d934d285a"),
+             "SCH-SI-B:v3.2": ("SCH-SI-B-v3.2.json", "6427265a02aeb7ce15d4795471e7bb9b08856f60bbb53a413fa23016805079dd")},
 }
+LINE_VERSION = {"v3.1": "v3.1", "v4": "v3.1", "v4-sb": "v3.1", "v4-e1": "v3.1", "v3.2": "v3.2"}   # the sets a line's pin carries
+RECORD_SHA256 = RECORDS_BY_VERSION[LINE_VERSION[XCHOLE_LINE]]      # the installed records at the pin of THIS line
 
 
 class XcholePinError(RuntimeError):
@@ -190,7 +199,7 @@ def xc_pairing_reference():
 
 
 class XcholeFunctional(PointFunctional):
-    """An installed v3.1 set, or a DIAGNOSTIC variant of it with edited theta fields (name 'SET@key=value,...').
+    """An installed set of the line's pin (v3.1; v3.2 on the line v3.2), or a DIAGNOSTIC variant of it with edited theta fields (name 'SET@key=value,...').
     Variants may edit only theta fields that the cached norms do not depend on (xchole registry.HASH_EXCLUDE, e.g. the
     payback's ups_p, rs0_pb), so the record's cached norms stay valid; the model is built with xchole's public
     params.candidate_params / params.of_record / jax_si.ModelXC_SCHSI (exactly as SCHSIFunctional.build_model), which
@@ -201,7 +210,7 @@ class XcholeFunctional(PointFunctional):
     def __init__(self, name: str):
         base, edits = parse_variant(name)
         if base not in RECORD_SHA256:
-            raise KeyError(f"{base!r}: only the pinned v3.1 sets {sorted(RECORD_SHA256)}")
+            raise KeyError(f"{base!r}: the xchole line {XCHOLE_LINE!r} (XCSB_XCHOLE_LINE) carries only {sorted(RECORD_SHA256)}")
         xchole, commit = import_pinned_xchole()
         import copy
         import json

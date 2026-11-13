@@ -19,6 +19,9 @@ xcsb = "xcsb.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+xcsb = ["studies/*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [

@@ -714,6 +714,46 @@ the term and its potential vanish at spin-symmetric states, so only magnetic ins
 - Cost (scaled from Fe80, uncertain): about 50 min per SCF at 100 Ry, level 4, quarter node (AFM ~100 iterations); level 8 on a
   full node ~1-2 h; stages P+G ≈ 2 allocations, stage F ≈ 1-2 allocations of 4 h (batch would fit better).
 
+### 6.12 Relaxed lattice constants of ionic solids (user 2026-11-13; staged: `xcsb.studies.ionic_lc`, `job_ionic_lc.sh`)
+
+User request: "test the relaxed lattice constants of ionic solids using the approach my collaborator has used". This is the
+collaborator's LC20 protocol applied to the five rock-salt members of LC20, not the F1 protocol of Sec. 6.3 (11 volumes, ±4 %,
+d = 4, own convergence ladder), which stays the plan for the full family. Nothing was read from the collaborator's code: the
+protocol and the numbers were given by the user.
+
+- Solids and reference: LiF 3.972, LiCl 5.070, NaF 4.582, NaCl 5.569, MgO 4.189 Å (conventional; zero-point-corrected
+  experiment, LC20 set). Values, per-element cutoff floors, the collaborator's cross-check values and all source strings:
+  `src/xcsb/studies/ionic_lc_reference.json` (NOT yet an archive entry: banking is outside this repo; open item).
+- Functionals: PBE, r2SCAN (reference functionals: computed once in this protocol, then banked, `xcsb lc bank`),
+  SCH-SI-A:v3.2, SCH-SI-B:v3.2. xchole line `v3.2` = strongxc-v3 019c8acd6 (the v3.2 sets replace v3.1 there; the adapter
+  selects the installed records by line, `RECORDS_BY_VERSION`; a v3.1 name on the v3.2 line, or the reverse, raises).
+- Cell and SCF: rock salt, primitive, 2 atoms, nspin 1, fixed occupations, nbnd = n_occ + 4 (n_occ from the SG15 valence
+  charges: LiF, LiCl 5; NaF, NaCl, MgO 8); ecutwfc = max(80 Ry, element floors Li 82, F 96, Na 96, Cl 66, Mg 96, O 96) = LiF 96,
+  LiCl 82, NaF 96, NaCl 96, MgO 96 Ry; ecutrho = 8 ecutwfc; conv_thr 1e-8 Ry, Broyden β 0.3; cold starts: QE's cold start, the
+  converged carrier (QE's TPSS) in the same session, then the hook (the collaborator starts from PBE).
+- k mesh: N_i = max(1, ceil(|b_i| / 0.1 Å⁻¹)), |b_i| with 2π (VASP k-spacing convention), from the reference cell, fixed across
+  the scan: LiF 28³ (624 irreducible), LiCl 22³ (328), NaF 24³ (413), NaCl 20³ (256), MgO 26³ (511); Γ-centred, unshifted (the
+  host's convention, Sec. 6.0). One rank per k-point pool (8 pools on a quarter node, as M1).
+- Scan and fit: a = a_ref (1 + s), s = −3, …, +3 % (7 points; stages R: reference functionals, M: model sets); third-order
+  Birch-Murnaghan (`xcsb.bench.eos.bm3_fit`). EXTENSION stage (RX, MX; scan design, not a relaxed check): when the unguarded
+  fit of a complete scan has V0 outside the inner two thirds of the scanned volumes, points are added at 1 % spacing on the
+  side of the minimum (as many as put that V0 inside, at least one; |s| ≤ 8 %) and the test repeats; the final, guarded fit
+  uses all points. A scan not bracketed at |s| = 8 %, or a failed fit, gives no value (reported). `bm3_fit(V, E, guard=False)`
+  returns the two guard conditions as flags; the default (guarded) behaviour is unchanged for every other study. Expected from
+  the collaborator's PBE values: LiF, NaF, NaCl (a0/a_ref − 1 = 2.3-2.6 %, beyond the inner bound 2.05 %) get one PBE extension
+  point (+4 %); r2SCAN none.
+- Table (`xcsb lc table`): per solid and functional a_ref, a0, a0 − a_ref, B0, B0′, rms, the scan range (extended scans
+  marked), the plain ±3 % fit (unguarded, labelled; the collaborator's protocol like for like) next to the collaborator's a0
+  and B0 (cross-check, their own host); ME, MAE, MARE over the five solids for both fits.
+- Cost (scheduling estimate, UNCALIBRATED: the Fe 80 Ry timing scaled by cell volume, nspin, irreducible k, (ecutwfc/80)^1.5 and
+  nbnd/12, measured without pools): 0.4-0.85 h per SCF on a quarter node; reference stage ≈ 9 node-h, model stage ≈ 12 node-h
+  plus extensions, i.e. several 4 h allocations per stage, not one. The estimates rescale themselves from the run's finished
+  points (median measured / estimated, from 4 points on), and the table reports that factor; stages resume (finished points
+  skipped; claims let two allocations share the run directory).
+- Job: `launch_ionic_lc.sh ref|model|all [pin]` (1 node, ≤ 4 h, m2360; own clone at main; xchole clone `$W/src/xchole-v3.2` at
+  the pin, passed to the job explicitly; refuses at ≥ 2 interactive jobs). Phase 0: the four functionals load at the pin; PBE
+  and SCH-SI-A:v3.2 converge `LC-phase0` (MgO, 40 Ry, 6³ k; plumbing only); a failure stops the job.
+
 ## 7. Verification tiers
 
 | tier | what | where | pass |

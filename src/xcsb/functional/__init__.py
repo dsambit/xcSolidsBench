@@ -4,11 +4,11 @@ from __future__ import annotations
 from .contract import (ContractError, NegativeDensityError, PointFunctional, PointInputs, PointOutputs, HESS_PAIRS)
 from .libxc import LIBXC_CODES, LibxcFunctional
 
-XCHOLE_NAMES = ("SCH-SI-A:v3.1", "SCH-SI-B:v3.1")
+XCHOLE_NAMES = ("SCH-SI-A:v3.1", "SCH-SI-B:v3.1", "SCH-SI-A:v3.2", "SCH-SI-B:v3.2")   # v3.2: only on the xchole line v3.2
 
 
 def get(name: str) -> PointFunctional:
-    """PBE, r2SCAN, SCAN, TPSS (libxc); SCH-SI-A:v3.1, SCH-SI-B:v3.1 (xchole at the pin); model:test (synthetic)."""
+    """PBE, r2SCAN, SCAN, TPSS (libxc); SCH-SI-A/B:v3.1 or (line v3.2) SCH-SI-A/B:v3.2 (xchole at the pin); model:test (synthetic)."""
     if name in LIBXC_CODES:
         return LibxcFunctional(name)
     if "+E1" in name and name.split("+E1")[0] in XCHOLE_NAMES:
