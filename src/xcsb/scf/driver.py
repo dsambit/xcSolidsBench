@@ -151,16 +151,32 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
                   restart="" if warm is None else warm["mode"])
     if warm is not None and warm["mode"] == "wavefunctions":
         s.density_from_orbitals(src_rec["eigenvalues_ry"], src_rec["kweights"])
-    if warm is None:
-        carrier = {"history": []}
+    scaffold = warm is None and case.start == "pbe-scaffold"
+    if scaffold:
+        # Start 'pbe-scaffold' (2026-11-13, after the ionic lattice-constant stall: LiF at 96 Ry, 624 k, never left the first
+        # carrier iteration, with c_bands non-convergence warnings; leading hypothesis: QE's TPSS on the starting state, the
+        # atomic superposition with the Thomas-Fermi tau guess of potinit, gives a Hamiltonian Davidson cannot converge).
+        # QE's own XC is never applied: (0) one diagonalization with XC off (extpot = extkin = 0: the kinetic, ionic and
+        # Hartree terms of QE's starting density), mixed with coefficient 1, so the density is that step's output density,
+        # sum f |psi|^2 >= 0 with tau >= tau_W (the atomic superposition itself is not positive, M0); (1) the scaffold
+        # functional through the hooks to QE's conv_elec; (2) the target functional (the loop below). Phases (0), (1) run after
+        # the record exists (below).
+        if carrier_beta is not None:
+            raise ValueError("carrier_beta applies to the start 'tpss-carrier' only")
+        carrier = {"kind": "pbe-scaffold", "functional": settings.SCAFFOLD_FUNCTIONAL, "history": []}
+        start = (f"one XC-free diagonalization (mixing coefficient 1), then converged {settings.SCAFFOLD_FUNCTIONAL} "
+                 "through the hooks, then the hook of the functional")
+    elif warm is None:
+        carrier = {"kind": "tpss-carrier", "history": []}
         tc = time.time()
         beta_c = case.mixing_beta if carrier_beta is None else carrier_beta     # a recorded deviation when set (the start only)
         for it in range(1, maxiter + 1):
+            ti = time.time()
             s.driver.diagonalize()
             s.driver.mix(mix_coef=beta_c)
             dr2 = float(s.driver.get_scf_error())
             conv = bool(s.driver.qepy_modules.control_flags.get_conv_elec())
-            carrier["history"].append({"iter": it, "dr2": dr2, **s.magnetization()})
+            carrier["history"].append({"iter": it, "dr2": dr2, "t_iter_s": time.time() - ti, **s.magnetization()})
             if conv:
                 break
         else:
@@ -182,13 +198,13 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
         rec["previous_attempts"] = previous_attempts
     record_path = record_path or os.path.join(workdir, "record.json")
 
-    def hook_loop(history, label):
-        """Hook iterations until QE's conv_elec (read from the flag; QEpy's end_scf runs once, at the very end)."""
+    def hook_loop(history, label, func=f):
+        """Hook iterations of func until QE's conv_elec (read from the flag; QEpy's end_scf runs once, at the very end)."""
         e_prev = None
         for it in range(1, maxiter + 1):
             ti = time.time()
             rho, tau = s.spin_densities()
-            res = evaluate_on_grid(f, s.grid, rho, tau, comm, chunk)
+            res = evaluate_on_grid(func, s.grid, rho, tau, comm, chunk)
             th = time.time() - ti
             e_xc = res.e_xc if rank == 0 else None
             s.set_potentials(e_xc, res.v if rank == 0 else None, res.v_tau if rank == 0 else None)
@@ -213,6 +229,21 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
         raise SCFError(f"{label}: not converged in {maxiter} iterations (last dr2 {dr2:.3e})")
 
     try:
+        if scaffold:
+            tc = time.time()
+            zero = np.zeros((2,) + s.shape) if rank == 0 else None
+            s.set_potentials(0.0 if rank == 0 else None, zero, zero)
+            s.driver.diagonalize()
+            s.driver.mix(mix_coef=1.0)
+            carrier["bootstrap"] = {"potential": "XC off (extpot = extkin = 0)", "mix_coef": 1.0,
+                                    "dr2": float(s.driver.get_scf_error()), "t_iter_s": time.time() - tc}
+            if rank == 0:
+                _write(record_path, rec)
+            fs = f if functional_name == settings.SCAFFOLD_FUNCTIONAL else get_functional(settings.SCAFFOLD_FUNCTIONAL)
+            its = hook_loop(carrier["history"], "scaffold", fs)
+            carrier.update(iterations=its, magnetization=s.magnetization(), seconds=time.time() - tc,
+                           mixing_beta=case.mixing_beta)
+            s.driver.embed.finish = False                 # as after the native carrier: the loop continues in this session
         it = hook_loop(rec["history"], "hook")
         rho, tau = s.spin_densities()
         res = evaluate_on_grid(f, s.grid, rho, tau, comm, chunk)

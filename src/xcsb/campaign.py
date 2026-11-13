@@ -26,8 +26,15 @@ import time
 
 SAFETY = 1.25            # a task starts only if SAFETY * est_s fits the remaining time
 POLL_S = 20.0
-RANKS_PER_SLOT = 8       # a quarter node: 8 ranks x 8 logical CPUs (4 cores), OMP_NUM_THREADS = 4
-SRUN = ["srun", "-N", "1", "-c", "8", "--exact", "--cpu-bind=cores"]
+RANKS_PER_SLOT = 8       # a quarter node: 8 ranks x 8 logical CPUs (4 cores), OMP_NUM_THREADS = 4 (the default layout)
+
+
+def srun_command(study, task):
+    """The srun prefix of a task: 8 ranks x 8 logical CPUs per quarter-node slot, or the study's own layout
+    study.srun_layout(task) -> (ranks, logical CPUs per rank) (the job script sets OMP_NUM_THREADS to match)."""
+    layout = getattr(study, "srun_layout", None)
+    n, c = layout(task) if layout else (RANKS_PER_SLOT * task["width"], 8)
+    return ["srun", "-N", "1", "-c", str(int(c)), "--exact", "--cpu-bind=cores", "-n", str(int(n))]
 
 
 def alive_jobs():
@@ -83,8 +90,8 @@ class Runner:
 
     # -- steps ---------------------------------------------------------------------------------------------------
     def _srun(self, task, seconds, log):
-        cmd = (["timeout", "--signal=TERM", "--kill-after=60", str(int(seconds))] + SRUN
-               + ["-n", str(RANKS_PER_SLOT * task["width"]), sys.executable, "-m", "xcsb.cli"] + self.study.command(self.run, task))
+        cmd = (["timeout", "--signal=TERM", "--kill-after=60", str(int(seconds))] + srun_command(self.study, task)
+               + [sys.executable, "-m", "xcsb.cli"] + self.study.command(self.run, task))
         return subprocess.Popen(cmd, stdout=open(log, "w"), stderr=subprocess.STDOUT)
 
     def tasks(self):

@@ -47,6 +47,7 @@ def test_cases():
     c = get_case("LC-NaCl-m3")
     assert c.nspin == 1 and c.occupations == "fixed" and c.nbnd == 12 and c.dual == 8 and c.kmesh == (20, 20, 20)
     assert c.kshift == (0, 0, 0) and c.ecutwfc == 96.0 and c.conv_thr == 1e-8 and c.mixing_beta == 0.3 and not c.diago_full_acc
+    assert c.start == "pbe-scaffold" and c.as_dict()["start"] == "pbe-scaffold"
     a = np.sqrt(2) * np.linalg.norm(c.structure.lattice[0]) / L.BOHR_PER_ANGSTROM
     assert a == pytest.approx(5.569 * 0.97, abs=1e-12) and c.structure.elements == {"Na": "Na", "Cl": "Cl"}
     assert c.as_dict()["ecutrho"] == 768.0
@@ -57,7 +58,128 @@ def test_cases():
         with pytest.raises(KeyError):
             L.parse_case(bad)
     p0 = get_case(L.PHASE0)
-    assert p0.ecutwfc == 40.0 and p0.kmesh == (6, 6, 6) and p0.dual == 8 and p0.nbnd == 12
+    assert p0.ecutwfc == 40.0 and p0.kmesh == (6, 6, 6) and p0.dual == 8 and p0.nbnd == 12 and p0.start == "pbe-scaffold"
+
+
+def test_start_setting():
+    from xcsb.bench.structures import bcc, rocksalt
+    from xcsb.host.qe import Case
+    from xcsb.scf import settings
+    assert settings.STARTS == ("tpss-carrier", "pbe-scaffold") and settings.SCAFFOLD_FUNCTIONAL == "PBE"
+    assert Case(rocksalt("Mg", "O", 7.9), ecutwfc=40.0).start == "tpss-carrier"          # every earlier study: unchanged
+    assert get_case("MgO-80-k8").start == "tpss-carrier" and get_case("MgO-80-k8").as_dict()["start"] == "tpss-carrier"
+    with pytest.raises(ValueError, match="start"):
+        Case(rocksalt("Mg", "O", 7.9), ecutwfc=40.0, start="pbe")
+    with pytest.raises(ValueError, match="nspin 1 only"):
+        Case(bcc("Fe", 5.4), ecutwfc=40.0, nspin=2, starting_magnetization={"Fe": 0.5}, start="pbe-scaffold")
+
+
+def test_diag_cases_and_layout():
+    from xcsb import campaign
+    for k, st, start in ((12, "tpss", "tpss-carrier"), (12, "pbe", "pbe-scaffold"), (28, "tpss", "tpss-carrier"), (28, "pbe", "pbe-scaffold")):
+        c, ref = get_case(L.diag_case_name(k, st)), get_case("LC-LiF-p0")
+        assert c.start == start and c.kmesh == (k, k, k)
+        assert (c.ecutwfc, c.dual, c.nbnd, c.occupations, c.nspin, c.mixing_beta) == (ref.ecutwfc, ref.dual, ref.nbnd, ref.occupations, ref.nspin, ref.mixing_beta)
+        assert np.array_equal(c.structure.lattice, ref.structure.lattice)
+    assert get_case("LC-diag-k28-pbe").as_dict() == get_case("LC-LiF-p0").as_dict()     # the production point itself
+    with pytest.raises(KeyError):
+        L.parse_diag("LC-diag-k12-lda")
+    # one rank per pool everywhere; every run has at least one k point per pool; each phase fills the node (256 logical CPUs)
+    for ph in ("A", "B"):
+        cpus = 0
+        for n, spec in L.DIAG_RUNS.items():
+            if spec[5] != ph:
+                continue
+            ranks, c, threads, args = L.diag_command("/run", n)
+            assert args[args.index("--npool") + 1] == str(ranks) and c == 2 * threads
+            assert L.nk_irreducible(L.parse_diag(spec[0])[0]) >= ranks
+            cpus += ranks * c
+        assert cpus == 256
+    assert len({L.diag_dir("/run", n) for n in L.DIAG_RUNS}) == len(L.DIAG_RUNS)
+    # the campaign layout: 32 single-thread ranks on 32 cores per slot, npool = ranks; other studies keep 8 ranks x 8 CPUs
+    t = L.tasks("/nonexistent")[0]
+    assert L.srun_layout(t) == (32, 2) and L.NPOOL == L.RANKS_PER_SLOT == 32
+    assert campaign.srun_command(L, t) == ["srun", "-N", "1", "-c", "2", "--exact", "--cpu-bind=cores", "-n", "32"]
+    from xcsb.studies import mgo_gap
+    assert campaign.srun_command(mgo_gap, {"width": 1}) == ["srun", "-N", "1", "-c", "8", "--exact", "--cpu-bind=cores", "-n", "8"]
+    assert all(L.nk_irreducible(L.kmesh(s)[0]) >= L.NPOOL for s in L.SOLIDS)
+
+
+PW_OUT = """
+     number of k points=   624
+     Starting wfcs are random
+     total cpu time spent up to now is       82.0 secs
+
+     iteration #  1     ecut=    96.00 Ry     beta= 0.30
+     Davidson diagonalization with overlap
+     c_bands:  5 eigenvalues not converged
+     c_bands:  1 eigenvalues not converged
+     c_bands:  5 eigenvalues not converged
+     total cpu time spent up to now is     2900.0 secs
+
+     iteration #  2     ecut=    96.00 Ry     beta= 0.30
+     c_bands:  1 eigenvalues not converged
+"""
+
+
+def _diag_rec(run, name, start_times, hook_times, t_hook, status="ok", boot=None, etot=-80.0):
+    d = L.diag_dir(run, name)
+    os.makedirs(d, exist_ok=True)
+    car = {"history": [{"iter": i + 1, "t_iter_s": t, **({"t_hook_s": 1.0} if boot is not None else {})} for i, t in enumerate(start_times)]}
+    if boot is not None:
+        car["bootstrap"] = {"t_iter_s": boot}
+    r = {"status": status, "carrier": car, "history": [{"iter": i + 1, "t_iter_s": t, "t_hook_s": t_hook} for i, t in enumerate(hook_times)]}
+    if status == "ok":
+        car["iterations"] = len(start_times)
+        r.update(iterations=len(hook_times), energies_ry={"etot": etot}, seconds=sum(start_times) + sum(hook_times) + (boot or 0))
+    json.dump(r, open(os.path.join(d, "record.json"), "w"))
+
+
+def test_diag_summary(tmp_path):
+    pw = L.parse_pw_out(PW_OUT)
+    assert pw["nk"] == 624 and [i["iteration"] for i in pw["iterations"]] == [1, 2] and pw["last_cpu_s"] == 2900.0
+    assert pw["iterations"][0] == {"iteration": 1, "cpu_s_at_start": 2900.0, "c_bands_warnings": 3, "eigenvalues_not_converged": 11}
+    run = str(tmp_path)
+    t0 = L.diag_summary(run)
+    assert all(r["status"] == "missing" for r in t0["rows"].values()) and L.diag_cost_json(t0) is None and not t0["verdict"]["stall_gone"]
+    L.render_diag(t0)
+    # the old start on the full mesh: stalled (pw.out only); the new start: 14 + 2 iterations at 21 s (20 k per pool, 1 s hook)
+    os.makedirs(L.diag_dir(run, "k28_tpss"))
+    open(os.path.join(L.diag_dir(run, "k28_tpss"), "pw.out"), "w").write(PW_OUT)
+    _diag_rec(run, "k28_pbe", [21.0] * 14, [21.0] * 2, 1.0, boot=30.0)
+    _diag_rec(run, "k28_pbe_r64", [11.0] * 14, [11.0] * 2, 1.0, boot=16.0, etot=-80.0 + 1e-9)
+    _diag_rec(run, "k12_pbe", [4.0] * 14, [4.0] * 2, 1.0, boot=5.0, etot=-79.9)
+    _diag_rec(run, "k12_tpss", [3.0] * 18, [4.0] * 12, 1.0, etot=-79.9 + 2e-9)
+    _diag_rec(run, "k12_pbe_schA", [4.0] * 14, [24.0] * 5, 21.0, status="running", boot=5.0)       # killed: a partial record
+    t = L.diag_summary(run)
+    rows, v = t["rows"], t["verdict"]
+    assert rows["k28_tpss"]["status"].startswith("no record") and rows["k28_tpss"]["pw_out"]["c_bands_warnings"] == 4
+    assert rows["k28_pbe"]["k_per_pool"] == 20 and rows["k28_pbe"]["c_k_s"] == pytest.approx(1.0)
+    assert rows["k28_pbe_r64"]["k_per_pool"] == 10 and rows["k28_pbe_r64"]["c_k_s"] == pytest.approx(1.0)
+    assert rows["k12_tpss"]["qe_s_per_iteration_median"] == pytest.approx(3.0) and rows["k12_pbe_schA"]["status"] == "running"
+    assert v["stall_gone"] and v["old_start_iterations_started"] == 2 and v["k12_etot_new_minus_old_ry"] == pytest.approx(-2e-9)
+    assert v["k28_etot_r32_minus_r64_ry"] == pytest.approx(-1e-9) and v["k12_etot_r32_minus_r8t4_ry"] is None
+    c = L.diag_cost_json(t)
+    assert c["c_k_lif_s"] == pytest.approx(1.0) and c["it_scaffold"] == 14 and c["it_hook"] == {"PBE": 2}
+    assert c["hook_sch_s"] == pytest.approx(21.0) and c["hook_libxc_s"] == pytest.approx(1.0) and "SCH-SI" not in c["it_hook"]
+    txt = L.render_diag(t)
+    assert "Full study from these constants" in txt and "no record (killed or stalled)" in txt and "| 624 |" in txt
+    # a run reads the measured constants; the prior stays where nothing was measured
+    prod = str(tmp_path / "prod")
+    os.makedirs(prod)
+    assert L.cost(prod)["source"].startswith("prior") and L.cost(prod)["c_k_lif_s"] == L.COST["c_k_lif_s"]
+    json.dump(c, open(os.path.join(prod, "COST.json"), "w"))
+    cc = L.cost(prod)
+    assert cc["c_k_lif_s"] == pytest.approx(1.0) and cc["it_hook"] == {"PBE": 2, "r2SCAN": 12, "SCH-SI": 17} and "diagnostic" in cc["source"]
+    task = L._task("LiF", "PBE", 0, "R")
+    assert L.estimate_s(task, cc) == pytest.approx(cc["overhead_s"] + (1 + 14 + 2) * 20 * 1.0 + 2 * 1.0)
+    assert [t_["est_s"] for t_ in L.tasks(prod) if t_["id"] == task["id"]] == [pytest.approx(L.estimate_s(task, cc))]
+    assert L.estimate_s(L._task("NaCl", "PBE", 0, "R"), cc) == pytest.approx(
+        cc["overhead_s"] + 17 * 8 * (291.3857193720106 / 105.72174657129186) * (12 / 9) + 2.0)
+    json.dump({"c_k": 1.0}, open(os.path.join(prod, "COST.json"), "w"))
+    os.utime(os.path.join(prod, "COST.json"), ns=(1, 1))
+    with pytest.raises(KeyError, match="unknown cost keys"):
+        L.cost(prod)
 
 
 @needs_pseudos
@@ -77,9 +199,9 @@ def test_tasks(tmp_path):
     assert [t["step"] for t in ts[:7]] == [-3, -2, -1, 0, 1, 2, 3] and ts[0]["case"] == "LC-LiF-m3" and ts[0]["functional"] == "PBE"
     assert all(t["est_s"] > 0 and t["width"] == 1 for t in ts)
     assert L.command(str(tmp_path), ts[0]) == ["scf", "--case", "LC-LiF-m3", "--mode", "hooked", "--name", "PBE", "--root",
-                                               os.path.join(str(tmp_path), "scf"), "--npool", "8"]
+                                               os.path.join(str(tmp_path), "scf"), "--npool", "32"]
     hours = {st: sum(t["est_s"] for t in ts if t["stage"] == st) / 3600 / 4 for st in ("R", "M")}
-    print("estimated node-hours (uncalibrated):", {k: round(v, 1) for k, v in hours.items()})
+    print("estimated node-hours (prior cost constants, before the diagnostic):", {k: round(v, 1) for k, v in hours.items()})
 
 
 def test_model_sets_are_the_v32_line():

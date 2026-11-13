@@ -293,6 +293,14 @@ end: final hook on the converged density; record
 failure (MAXITER, negative ρ_σ, NaN, any QE error): raise; the record is written with status "failed" and the history
 ```
 
+Second start, `Case.start = "pbe-scaffold"` (2026-11-13; `settings.STARTS`; nspin 1 only; used by `xcsb.studies.ionic_lc`, every
+earlier study keeps `"tpss-carrier"`, recorded in `case.start` and `carrier.kind`): QE's own XC is never applied.
+(0) one diagonalization with XC off (extpot = extkin = 0, exttype 4: kinetic, ionic and Hartree terms of QE's starting
+density), mixed with coefficient 1, so the density handed on is that step's output density (Σ f|ψ|² ≥ 0, τ ≥ τ_W; the atomic
+superposition itself is not positive, M0); (1) `settings.SCAFFOLD_FUNCTIONAL` (libxc PBE, v_τ = 0) through the hook loop to
+QE's conv_elec at the case's β; (2) the hook loop of the functional. Reason: Sec. 6.12 (the native carrier stalled for LiF).
+Not yet run on a node when written: the diagnostic job of Sec. 6.12 is its first test.
+
 - SCF threshold (user 2026-11-10), two named constants in `scf/settings.py`, the class recorded in every result:
   CONV_THR_BENCH = 1e-8 Ry per cell for every benchmark SCF (all systems and functionals, M1 onward) and
   CONV_THR_VERIFY = 1e-10 Ry per cell for the verification tiers V3-V6 (labelled "verification").
@@ -729,11 +737,33 @@ protocol and the numbers were given by the user.
   selects the installed records by line, `RECORDS_BY_VERSION`; a v3.1 name on the v3.2 line, or the reverse, raises).
 - Cell and SCF: rock salt, primitive, 2 atoms, nspin 1, fixed occupations, nbnd = n_occ + 4 (n_occ from the SG15 valence
   charges: LiF, LiCl 5; NaF, NaCl, MgO 8); ecutwfc = max(80 Ry, element floors Li 82, F 96, Na 96, Cl 66, Mg 96, O 96) = LiF 96,
-  LiCl 82, NaF 96, NaCl 96, MgO 96 Ry; ecutrho = 8 ecutwfc; conv_thr 1e-8 Ry, Broyden β 0.3; cold starts: QE's cold start, the
-  converged carrier (QE's TPSS) in the same session, then the hook (the collaborator starts from PBE).
+  LiCl 82, NaF 96, NaCl 96, MgO 96 Ry; ecutrho = 8 ecutwfc; conv_thr 1e-8 Ry, Broyden β 0.3; cold starts with the start
+  `pbe-scaffold` (Sec. 5: XC-free step, converged PBE through the hooks, then the functional; the collaborator: iteration 0 =
+  libxc PBE through the hooks).
+- STALL of the first attempt (jobs 61245307 ref, 61245548 model, 2026-11-13, cancelled after 50 min; start `tpss-carrier`,
+  8 ranks × 4 threads, 8 pools): phase 0 passed (MgO 40 Ry, 6³ k: PBE 18 + 12 iterations in 104 s, SCH-SI-A:v3.2 18 + 17 in
+  274 s), but all eight LiF SCFs (624 k, 96 / 768 Ry, 9 bands) were still in carrier iteration 1 after 48 min, pw.out showing
+  18-31 lines "c_bands: 1 (or 5) eigenvalues not converged". Hypotheses, ranked: (1) QE's TPSS on the starting state (potinit:
+  the atomic superposition, which is not positive, with a Thomas-Fermi guess for τ, so τ < τ_W wherever gradients are large:
+  hard Li 1s / F 2p cores at 96 Ry) gives a first Hamiltonian whose τ-dependent kinetic term Davidson cannot converge; each k
+  point then runs to Davidson's iteration limit (~20-30 × a normal solve), times 78 k per pool. The carrier is the common
+  factor of PBE and set A, the warnings are QE's own, and the collaborator reports the same for QE's TPSS start. (2) Layout:
+  78 k points per pool in sequence, with threads that buy little on 36³-48³ grids, so even a healthy iteration is slow (the
+  first scheduling estimate assumed the Fe timing, 5-10 × too low). (3) Random starting orbitals (SG15 UPFs are believed to
+  carry no pseudo-wavefunctions, so 'atomic+random' is random; to confirm in pw.out) with only 4 buffer bands: slower first
+  solves, but not non-convergence by itself. MgO in `mgo_gap` used the same carrier, diagonalization and starting orbitals
+  (differences: dual 4, 12 bands with diago_full_acc, 16-47 k points, no Li / F): no setting protected it; either its starting
+  Hamiltonian is benign or the slow first iteration went unnoticed at 29 k points (its records are not on the laptop).
+- DIAGNOSTIC (`launch_ionic_lc.sh diag`, `job_ionic_lc_diag.sh`, 1 node, 30 min; `xcsb lc diag-summary`): LiF at a_ref, PBE;
+  phase A, 12³ k (72 irreducible): old start | new start | new start with SCH-SI-A:v3.2 (hook cost) | new start on 8 ranks ×
+  4 threads; phase B, 28³ k: old start | new start (the production slot) | new start on 64 pools. Output: per-iteration wall
+  times, QE's cpu times and c_bands warnings per iteration, seconds per k point and iteration, energy differences between
+  starts and layouts, `diag_summary.md`, and `COST.json` (measured c_k, hook time, iteration counts) for the estimates.
 - k mesh: N_i = max(1, ceil(|b_i| / 0.1 Å⁻¹)), |b_i| with 2π (VASP k-spacing convention), from the reference cell, fixed across
   the scan: LiF 28³ (624 irreducible), LiCl 22³ (328), NaF 24³ (413), NaCl 20³ (256), MgO 26³ (511); Γ-centred, unshifted (the
-  host's convention, Sec. 6.0). One rank per k-point pool (8 pools on a quarter node, as M1).
+  host's convention, Sec. 6.0). Layout: all parallelism in k-point pools: a quarter-node slot = 32 ranks × 1 thread (one
+  physical core each), npool 32 (8-20 k points per pool); the campaign runner takes the layout from the study
+  (`srun_layout`), other studies keep 8 ranks × 4 threads.
 - Scan and fit: a = a_ref (1 + s), s = −3, …, +3 % (7 points; stages R: reference functionals, M: model sets); third-order
   Birch-Murnaghan (`xcsb.bench.eos.bm3_fit`). EXTENSION stage (RX, MX; scan design, not a relaxed check): when the unguarded
   fit of a complete scan has V0 outside the inner two thirds of the scanned volumes, points are added at 1 % spacing on the
@@ -745,14 +775,18 @@ protocol and the numbers were given by the user.
 - Table (`xcsb lc table`): per solid and functional a_ref, a0, a0 − a_ref, B0, B0′, rms, the scan range (extended scans
   marked), the plain ±3 % fit (unguarded, labelled; the collaborator's protocol like for like) next to the collaborator's a0
   and B0 (cross-check, their own host); ME, MAE, MARE over the five solids for both fits.
-- Cost (scheduling estimate, UNCALIBRATED: the Fe 80 Ry timing scaled by cell volume, nspin, irreducible k, (ecutwfc/80)^1.5 and
-  nbnd/12, measured without pools): 0.4-0.85 h per SCF on a quarter node; reference stage ≈ 9 node-h, model stage ≈ 12 node-h
-  plus extensions, i.e. several 4 h allocations per stage, not one. The estimates rescale themselves from the run's finished
-  points (median measured / estimated, from 4 points on), and the table reports that factor; stages resume (finished points
-  skipped; claims let two allocations share the run directory).
-- Job: `launch_ionic_lc.sh ref|model|all [pin]` (1 node, ≤ 4 h, m2360; own clone at main; xchole clone `$W/src/xchole-v3.2` at
-  the pin, passed to the job explicitly; refuses at ≥ 2 interactive jobs). Phase 0: the four functionals load at the pin; PBE
-  and SCH-SI-A:v3.2 converge `LC-phase0` (MgO, 40 Ry, 6³ k; plumbing only); a failure stops the job.
+- Cost (scheduling): seconds = overhead + (1 + it_scaffold + it_hook) × ⌈n_k / 32⌉ × c_k + it_hook × hook, c_k = c_k(LiF) ×
+  (V / V_LiF)(ecutwfc / 96)^1.5 (nbnd / 9). Before the diagnostic only a PRIOR exists (c_k(LiF) 6 s per k point and iteration
+  on one rank, an upper bound from phase 0 of the stalled job; the collaborator's 49 s per LC20 point on 128 ranks would mean a
+  few tenths of a second): 140 base points ≈ 42 node-h at 6 s, ≈ 10 at 1 s, ≈ 6 at 0.4 s (then the SCH-SI hook dominates).
+  The diagnostic's `COST.json` replaces the prior (copied into the run directory by the job); within a run the estimates also
+  rescale from the finished points (median measured / estimated, from 4 points on). Stages resume (finished points skipped;
+  claims let two allocations share the run directory).
+- Job: `launch_ionic_lc.sh diag|ref|model|all [pin]` (1 node, m2360; diag 30 min, the others ≤ 4 h; own clone at main; xchole
+  clone `$W/src/xchole-v3.2` at the pin, passed to the job explicitly; refuses at ≥ 2 interactive jobs). Run directories:
+  `2026-11-13_ionic_lc_diag`, `2026-11-13_ionic_lc_scaffold` (the stalled attempt's `2026-11-13_ionic_lc` is not reused).
+  Phase 0 of the production job: the four functionals load at the pin; PBE and SCH-SI-A:v3.2 converge `LC-phase0` (MgO, 40 Ry,
+  6³ k, new start; plumbing only); a failure stops the job.
 
 ## 7. Verification tiers
 

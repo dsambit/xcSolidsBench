@@ -35,6 +35,7 @@ class Case:
     mixing_beta: float = settings.MIXING_BETA
     nbnd: int | None = None
     diago_full_acc: bool = False           # converge the empty bands as tightly as the occupied ones (band gaps)
+    start: str = "tpss-carrier"            # the cold start of a hooked run (settings.STARTS; scf.driver.run_hooked)
 
     @property
     def conv_thr(self) -> float:
@@ -43,6 +44,10 @@ class Case:
     def __post_init__(self):
         if self.conv_class not in ("bench", "verification"):
             raise ValueError(f"conv_class {self.conv_class!r}: 'bench' or 'verification'")
+        if self.start not in settings.STARTS:
+            raise ValueError(f"start {self.start!r}: one of {settings.STARTS}")
+        if self.start == "pbe-scaffold" and self.nspin != 1:
+            raise ValueError("start 'pbe-scaffold': nspin 1 only (its XC-free first step carries no exchange splitting)")
         if self.nspin not in (1, 2):
             raise ValueError("nspin must be 1 or 2 (non-collinear magnetism is out of scope)")
         if self.nspin == 2 and not self.starting_magnetization and self.tot_magnetization is None:
@@ -60,7 +65,7 @@ class Case:
                 "degauss": self.degauss, "nspin": self.nspin, "starting_magnetization": dict(self.starting_magnetization),
                 "tot_magnetization": self.tot_magnetization, "nosym": self.nosym, "conv_thr": self.conv_thr,
                 "conv_class": self.conv_class,
-                "mixing_beta": self.mixing_beta, "nbnd": self.nbnd, "diago_full_acc": self.diago_full_acc}
+                "mixing_beta": self.mixing_beta, "nbnd": self.nbnd, "diago_full_acc": self.diago_full_acc, "start": self.start}
 
 
 def pw_input(case: Case, input_dft: str, pseudo_dir: str, outdir: str, prefix: str, maxiter: int = settings.MAXITER,

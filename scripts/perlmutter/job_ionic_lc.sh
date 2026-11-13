@@ -1,18 +1,20 @@
 #!/bin/bash
 # Relaxed lattice constants of rock-salt LiF, LiCl, NaF, NaCl, MgO (xcsb.studies.ionic_lc; DESIGN.md Sec. 6.12): inside ONE
 # 1-node allocation, from the clone this script lives in.
-#   bash scripts/perlmutter/job_ionic_lc.sh <run dir> <stages> <xchole pin (40 hex)>
+#   bash scripts/perlmutter/job_ionic_lc.sh <run dir> <stages> <xchole pin (40 hex)> [diagnostic run dir]
+# If <run dir>/COST.json is absent and the diagnostic run dir (job_ionic_lc_diag.sh) has one, it is copied: the measured cost
+# constants of the scheduling estimates (xcsb.studies.ionic_lc.cost).
 # stages: comma-separated from R (PBE, r2SCAN base scans, -3 ... +3 %), RX (their extension points), M (SCH-SI-A:v3.2,
 # SCH-SI-B:v3.2 base scans), MX (their extension points); e.g. R,RX or M,MX or R,RX,M,MX.
 # The xchole clone $W/src/xchole-v3.2 must be at the given pin, which must be the adapter's v3.2 pin (else STOP).
 # Phase 0 (once per run dir, a few minutes): the four functionals load; PBE and SCH-SI-A:v3.2 converge the plumbing case
-# LC-phase0 (MgO, 40 Ry, 6^3 k, dual 8, 8 pools) with a negative total energy; a failure STOPS the job (no campaign).
-# Then the campaign runner in quarter-node slots (8 ranks, 8 k-point pools, 4 threads) until done or the deadline (finished
+# LC-phase0 (MgO, 40 Ry, 6^3 k, dual 8, 8 pools, start pbe-scaffold) with a negative total energy; a failure STOPS the job.
+# Then the campaign runner in quarter-node slots (32 ranks x 1 thread, 32 k-point pools) until done or the deadline (finished
 # points are skipped: relaunching continues), then the table (lc_table.md, lc_table.json).
 set -uo pipefail
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 source "$REPO/scripts/perlmutter/env_xcsb.sh"
-RUN=${1:?run dir}; STAGES=${2:?stages, e.g. R,RX}; PIN=${3:?xchole pin}
+RUN=${1:?run dir}; STAGES=${2:?stages, e.g. R,RX}; PIN=${3:?xchole pin}; DIAG=${4:-}
 export XCSB_XCHOLE_SRC=$W/src/xchole-v3.2/src XCSB_XCHOLE_LINE=v3.2
 export PYTHONPATH="$REPO/src${PYTHONPATH:+:$PYTHONPATH}"     # this clone's xcsb, not the editable install of the main clone
 mkdir -p "$RUN"
@@ -29,7 +31,9 @@ python -c "import os, xcsb, sys; f = os.path.abspath(xcsb.__file__); sys.exit(0 
   || { echo "STOP: xcsb is not imported from $REPO" >> "$SUM"; exit 0; }
 python -c "import sys; from xcsb.functional import xchole as X; sys.exit(0 if X.XCHOLE_PIN == '$PIN' else 1)" \
   || { echo "STOP: the pin $PIN is not the adapter's v3.2 pin of this xcsb commit" >> "$SUM"; exit 0; }
-export OMP_NUM_THREADS=4 OMP_PLACES=cores OMP_PROC_BIND=close
+export OMP_NUM_THREADS=1 OMP_PLACES=cores OMP_PROC_BIND=close     # all parallelism in k-point pools (ionic_lc.srun_layout)
+if [ ! -f "$RUN/COST.json" ] && [ -n "$DIAG" ] && [ -f "$DIAG/COST.json" ]; then cp "$DIAG/COST.json" "$RUN/COST.json"; fi
+echo "cost model: $(python -c "from xcsb.studies import ionic_lc as L; print(L.cost('$RUN')['source'])")" >> "$SUM"
 
 P0="$RUN/phase0"
 if [ ! -f "$P0/PASS" ]; then
@@ -43,7 +47,7 @@ for n in L.FUNCTIONALS:
   rc=$?; echo "phase0 functionals rc=$rc" >> "$SUM"
   [ $rc -eq 0 ] || { echo "STOP: phase 0 (the functionals do not load at the pin)" >> "$SUM"; exit 0; }
   for F in PBE SCH-SI-A:v3.2; do
-    timeout 1500 srun -N 1 -n 8 -c 8 --exact --cpu-bind=cores python -m xcsb.cli scf --case LC-phase0 --mode hooked --name "$F" \
+    timeout 1500 srun -N 1 -n 8 -c 2 --exact --cpu-bind=cores python -m xcsb.cli scf --case LC-phase0 --mode hooked --name "$F" \
         --root "$P0" --npool 8 > "$P0/$F.log" 2>&1 &
   done
   wait

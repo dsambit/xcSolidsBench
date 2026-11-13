@@ -14,6 +14,9 @@ SMEARING = "gaussian"        # occupations in [0, 1] keep rho_sigma = sum f |psi
                              # Methfessel-Paxton smearing have negative occupations (M0: SG15 Fe gave rho_sigma < 0 with mv)
 STARTINGWFC = "atomic+random"
 CARRIER_DFT = "TPSS"         # QE-internal meta-GGA: makes QE compute, mix and apply tau; its XC is switched off (exttype 4)
+STARTS = ("tpss-carrier", "pbe-scaffold")   # Case.start (DESIGN Sec. 5): the converged native carrier (every study up to
+                             # 2026-11-13), or one XC-free diagonalization and the converged scaffold functional through the hooks
+SCAFFOLD_FUNCTIONAL = "PBE"  # start 'pbe-scaffold': libxc PBE through the hooks (v_tau = 0), QE's own XC never applied
 EXTTYPE_XC = 4               # QEpy: skip QE's XC; v_xc, v_tau and E_xc come from the hook
 
 
