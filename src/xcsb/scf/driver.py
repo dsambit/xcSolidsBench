@@ -151,7 +151,7 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
                   restart="" if warm is None else warm["mode"])
     if warm is not None and warm["mode"] == "wavefunctions":
         s.density_from_orbitals(src_rec["eigenvalues_ry"], src_rec["kweights"])
-    scaffold = warm is None and case.start == "pbe-scaffold"
+    scaffold = warm is None and case.start.startswith("pbe-scaffold")
     if scaffold:
         # Start 'pbe-scaffold' (2026-11-13, after the ionic lattice-constant stall: LiF at 96 Ry, 624 k, never left the first
         # carrier iteration, with c_bands non-convergence warnings; leading hypothesis: QE's TPSS on the starting state, the
@@ -163,9 +163,20 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
         # the record exists (below).
         if carrier_beta is not None:
             raise ValueError("carrier_beta applies to the start 'tpss-carrier' only")
-        carrier = {"kind": "pbe-scaffold", "functional": settings.SCAFFOLD_FUNCTIONAL, "history": []}
+        # Mixer reset (2026-11-13, after the ionic scan 61248332): QE's Broyden history (the mix buffer: the last residual and
+        # input density, and MIXING_NDIM secant pairs) survives the scaffold's convergence, and QE's iteration counter runs on.
+        # The first step of the functional then forms the secant pair (delta residual = the whole new residual, delta input
+        # ~ 0) from the scaffold's last step, and Broyden's update with that pair cancels the step: the density stays frozen
+        # until the pair has left the history (MIXING_NDIM + 1 = 9 iterations, seen in every run with either start), the
+        # pairs written meanwhile are normalized noise, and the first step after them is uncontrolled (7 of 68 A/B points
+        # ended with a negative mixed density). driver.end_scf() between the phases closes the SCF (mix buffer deleted,
+        # QE's iteration counter back to 0); the density and the orbitals stay in memory and the next diagonalize opens a
+        # new SCF from them. 'pbe-scaffold-stale' keeps the old behaviour for the before/after diagnostic.
+        carrier = {"kind": case.start, "functional": settings.SCAFFOLD_FUNCTIONAL, "history": [],
+                   "mixer_reset": case.start == "pbe-scaffold"}
         start = (f"one XC-free diagonalization (mixing coefficient 1), then converged {settings.SCAFFOLD_FUNCTIONAL} "
-                 "through the hooks, then the hook of the functional")
+                 "through the hooks, then the hook of the functional"
+                 + (" in a new SCF (mixer reset)" if carrier["mixer_reset"] else " (Broyden history of the scaffold kept)"))
     elif warm is None:
         carrier = {"kind": "tpss-carrier", "history": []}
         tc = time.time()
@@ -243,7 +254,10 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
             its = hook_loop(carrier["history"], "scaffold", fs)
             carrier.update(iterations=its, magnetization=s.magnetization(), seconds=time.time() - tc,
                            mixing_beta=case.mixing_beta)
-            s.driver.embed.finish = False                 # as after the native carrier: the loop continues in this session
+            if carrier["mixer_reset"]:
+                s.driver.end_scf()                        # new SCF for the functional: no Broyden history of the scaffold
+            else:
+                s.driver.embed.finish = False             # as after the native carrier: the loop continues in this session
         it = hook_loop(rec["history"], "hook")
         rho, tau = s.spin_densities()
         res = evaluate_on_grid(f, s.grid, rho, tau, comm, chunk)

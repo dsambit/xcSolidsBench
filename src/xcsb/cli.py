@@ -5,7 +5,7 @@
     xcsb tier v5 --out DIR                                                                            (under srun)
     xcsb run CASE.toml --functional NAME --out DIR                                                    (under srun)
     xcsb m1 tasks|ec|table --run DIR                                                                  (serial)
-    xcsb lc protocol | tasks|table|bank|diag-summary --run DIR                                               (serial)
+    xcsb lc protocol | tasks|table|bank|diag-summary|mix-summary --run DIR                                               (serial)
 """
 from __future__ import annotations
 
@@ -64,7 +64,7 @@ def main(argv=None):
     mg.add_argument("--run", required=True)
     lc = sub.add_parser("lc", help="ionic-solid lattice constants: protocol, task list, table, the banked reference record "
                         "(serial; no QE)")
-    lc.add_argument("what", choices=["protocol", "tasks", "table", "bank", "diag-summary"])
+    lc.add_argument("what", choices=["protocol", "tasks", "table", "bank", "diag-summary", "mix-summary"])
     lc.add_argument("--run", help="run directory (not needed for 'protocol')")
     pv = sub.add_parser("prep-variant", help="re-solve and cache the norms of norm-dependent xchole variants (serial)")
     pv.add_argument("names", nargs="+")
@@ -133,6 +133,11 @@ def main(argv=None):
             return 0
         if not a.run:
             p.error("lc tasks|table|bank need --run")
+        if a.what == "mix-summary":
+            res = L.mix_summary(a.run)
+            json.dump(res, open(os.path.join(a.run, "mix_summary.json"), "w"), indent=1, default=float)
+            print(L.render_mix(res))
+            return 0
         if a.what == "diag-summary":
             res = L.diag_summary(a.run)
             json.dump(res, open(os.path.join(a.run, "diag_summary.json"), "w"), indent=1, default=float)

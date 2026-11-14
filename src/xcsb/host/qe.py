@@ -46,7 +46,7 @@ class Case:
             raise ValueError(f"conv_class {self.conv_class!r}: 'bench' or 'verification'")
         if self.start not in settings.STARTS:
             raise ValueError(f"start {self.start!r}: one of {settings.STARTS}")
-        if self.start == "pbe-scaffold" and self.nspin != 1:
+        if self.start.startswith("pbe-scaffold") and self.nspin != 1:
             raise ValueError("start 'pbe-scaffold': nspin 1 only (its XC-free first step carries no exchange splitting)")
         if self.nspin not in (1, 2):
             raise ValueError("nspin must be 1 or 2 (non-collinear magnetism is out of scope)")

@@ -61,6 +61,8 @@ START = "pbe-scaffold"                             # the cold start of every poi
 RANKS_PER_SLOT = 32                                # a quarter node: 32 ranks x 2 logical CPUs (one core), OMP_NUM_THREADS = 1
 NPOOL = 32                                         # one rank per k-point pool (no eigenvalues needed)
 DIAG_STARTS = {"tpss": "tpss-carrier", "pbe": "pbe-scaffold"}
+MIX_STARTS = {"reset": "pbe-scaffold", "stale": "pbe-scaffold-stale"}
+MIX_K = 10                                         # the mixer test's coarse mesh (47 irreducible k: one per pool of a slot)
 PHASE0 = "LC-phase0"
 DIAG_SOLID = "LiF"                                 # the solid of the stall (the largest mesh)
 STAGE = {"PBE": "R", "r2SCAN": "R", "SCH-SI-A:v3.2": "M", "SCH-SI-B:v3.2": "M"}
@@ -125,7 +127,23 @@ def parse_diag(name):
     return int(parts[2][1:]), parts[3]
 
 
+def mix_case_name(solid, step, k, start):
+    return f"LC-mix-{solid}-{'m' if step < 0 else 'p'}{abs(int(step))}-k{int(k)}-{start}"
+
+
+def parse_mix(name):
+    parts = name.split("-")
+    if len(parts) != 6 or parts[:2] != ["LC", "mix"] or parts[4][:1] != "k" or not parts[4][1:].isdigit() or parts[5] not in MIX_STARTS:
+        raise KeyError(f"not a mixer-test case name: {name!r}")
+    solid, step = parse_case("-".join(["LC"] + parts[2:4]))
+    return solid, step, int(parts[4][1:]), parts[5]
+
+
 def get_case(name) -> Case:
+    if name.startswith("LC-mix-"):
+        solid, step, k, st = parse_mix(name)
+        return Case(structure(solid, step), ecutwfc=ecutwfc(solid), kmesh=(k, k, k), kshift=(0, 0, 0), occupations="fixed",
+                    nspin=1, nbnd=n_occ(solid) + NBND_EXTRA, dual=DUAL, conv_class="bench", start=MIX_STARTS[st])
     if name == PHASE0:
         return Case(structure("MgO"), ecutwfc=40.0, kmesh=(6, 6, 6), kshift=(0, 0, 0), occupations="fixed", nspin=1,
                     nbnd=n_occ("MgO") + NBND_EXTRA, dual=DUAL, conv_class="bench", start=START)
@@ -703,3 +721,62 @@ def render_diag(t) -> str:
                 f"quarter-node h = {(q['R'] + q['M']) / 4:.1f} node-h."]
     return "\n".join(out)
 
+
+
+# ---- the mixer test (job_ionic_lc_mix.sh) -------------------------------------------------------------------------------------------
+# Coarse mesh (MIX_K^3 k, protocol cutoffs and bands), 32 ranks x 1 thread: the seven A/B points of the scan 61248332 that ended
+# with a negative mixed density, and LiF at a_ref, each with the mixer reset between the scaffold and the functional ('reset',
+# the start 'pbe-scaffold') and without it ('stale', the behaviour until 143eca6). Never a result.
+MIX_POINTS = (("NaCl", -1, "SCH-SI-A:v3.2"), ("NaCl", -3, "SCH-SI-B:v3.2"), ("NaCl", -1, "SCH-SI-B:v3.2"), ("LiCl", 7, "SCH-SI-A:v3.2"),
+              ("LiCl", 6, "SCH-SI-B:v3.2"), ("LiCl", 7, "SCH-SI-B:v3.2"), ("NaF", 7, "SCH-SI-A:v3.2"), ("LiF", 0, "SCH-SI-A:v3.2"),
+              ("LiF", 0, "r2SCAN"))
+MIX_FROZEN_DEXC = 1e-4                             # Ry: an iteration whose E_xc differs less from the first one's is 'frozen'
+
+
+def mix_runs():
+    return [(mix_case_name(s, st, MIX_K, m), f) for s, st, f in MIX_POINTS for m in ("reset", "stale")]
+
+
+def mix_command(run, case, f):
+    return ["scf", "--case", case, "--mode", "hooked", "--name", f, "--root", scf_root(run), "--npool", str(NPOOL)]
+
+
+def mix_entry(run, case, f):
+    from ..tiers import run_dir
+    p = os.path.join(run_dir(scf_root(run), case, "hooked", f), "record.json")
+    solid, step, k, st = parse_mix(case)
+    out = {"case": case, "solid": solid, "step": step, "functional": f, "start": st, "status": "missing"}
+    if not os.path.exists(p):
+        return out
+    r = json.load(open(p))
+    h = r.get("history", [])
+    exc = [x["e_xc_ry"] for x in h if x.get("e_xc_ry") is not None]
+    frozen = 0
+    for e in exc[1:]:
+        if abs(e - exc[0]) >= MIX_FROZEN_DEXC:
+            break
+        frozen += 1
+    e = [x["etot_ry"] for x in h]
+    out.update(status=r.get("status"), error=(r.get("error") or "")[:160] or None, scaffold_iterations=r["carrier"].get("iterations"),
+               iterations=len(h), frozen_after_first=frozen, etot_ry=e[-1] if e else None,
+               etot_spread_last3_ry=(max(e[-3:]) - min(e[-3:])) if len(e) >= 3 else None,
+               dr2_last=h[-1]["dr2"] if h else None, min_rho=min((x["min_rho"][0] for x in h if "min_rho" in x), default=None),
+               seconds=r.get("seconds"))
+    return out
+
+
+def mix_summary(run):
+    return {"what": f"ionic lattice constants: mixer test ({MIX_K}^3 k; reset = new SCF for the functional, stale = Broyden "
+                    "history of the scaffold kept)", "rows": [mix_entry(run, c, f) for c, f in mix_runs()]}
+
+
+def render_mix(t) -> str:
+    g = lambda v, fmt: "" if v is None else format(v, fmt)      # noqa: E731
+    out = [f"# {t['what']}", "", "| solid | step (%) | functional | start | status | scaffold it. | it. | frozen it. | E_tot (Ry) | "
+           "spread of last 3 E (Ry) | last dr2 | min rho | s |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    for r in t["rows"]:
+        out.append(f"| {r['solid']} | {r['step']:+d} | {r['functional']} | {r['start']} | {r['status']}"
+                   f"{'' if not r.get('error') else ': ' + r['error']} | {g(r.get('scaffold_iterations'), 'd')} | {g(r.get('iterations'), 'd')} | "
+                   f"{g(r.get('frozen_after_first'), 'd')} | {g(r.get('etot_ry'), '.7f')} | {g(r.get('etot_spread_last3_ry'), '.1e')} | "
+                   f"{g(r.get('dr2_last'), '.1e')} | {g(r.get('min_rho'), '.2e')} | {g(r.get('seconds'), '.0f')} |")
+    return "\n".join(out) + "\n"

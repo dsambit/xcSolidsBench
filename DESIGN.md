@@ -301,6 +301,8 @@ superposition itself is not positive, M0); (1) `settings.SCAFFOLD_FUNCTIONAL` (l
 QE's conv_elec at the case's β; (2) the hook loop of the functional. Reason: Sec. 6.12 (the native carrier stalled for LiF).
 Not yet run on a node when written: the diagnostic job of Sec. 6.12 is its first test.
 
+Mixer reset at the phase change (2026-11-13, after the ionic scan 61248332): QE's Broyden buffer (last residual and input density, `MIXING_NDIM` secant pairs) and its iteration counter survive the start phase's convergence. The first step of the functional then forms a secant pair with Δ(residual) = the whole new residual and Δ(input) ≈ 0, and Broyden's update with it cancels the step: in every hooked run so far (either start) the density stayed frozen for `MIXING_NDIM` + 1 = 9 iterations, the pairs stored meanwhile were normalized noise, and the step after them was uncontrolled (7 of 68 A/B ionic points ended with a negative mixed density). With `"pbe-scaffold"` the driver calls `driver.end_scf()` between the scaffold and the functional (mix buffer deleted, iteration counter 0; density and orbitals stay in memory; `carrier.mixer_reset` in the record). `"pbe-scaffold-stale"` keeps the old behaviour, for the before/after test only (`job_ionic_lc_mix.sh`, `xcsb lc mix-summary`). OPEN: `"tpss-carrier"` (all Fe / M1 / gap studies) is unchanged and has the same nine frozen iterations; the ripple-seeded restarts also keep the history.
+
 - SCF threshold (user 2026-11-10), two named constants in `scf/settings.py`, the class recorded in every result:
   CONV_THR_BENCH = 1e-8 Ry per cell for every benchmark SCF (all systems and functionals, M1 onward) and
   CONV_THR_VERIFY = 1e-10 Ry per cell for the verification tiers V3-V6 (labelled "verification").

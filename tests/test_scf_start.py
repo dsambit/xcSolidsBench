@@ -88,8 +88,11 @@ def test_pbe_scaffold(fake, tmp_path, name):
     rec = D.run_hooked(_case("pbe-scaffold"), name, str(tmp_path), SerialComm(), npool=4)
     # QE's own XC is never applied: the first diagonalization already runs with the XC-free external potential
     boot = [("set_potentials", 0.0, 0.0, 0.0), ("diagonalize",), ("mix", 1.0)]
-    assert LOG == ([("session", "TPSS", 4, "")] + boot + HOOK("PBE") * 2 + HOOK(name) * 3 + [("evaluate", name), ("end_scf",), ("stop",)])
+    # the functional runs in a new SCF: end_scf between the scaffold and the functional (no Broyden history of the scaffold)
+    assert LOG == ([("session", "TPSS", 4, "")] + boot + HOOK("PBE") * 2 + [("end_scf",)] + HOOK(name) * 3
+                   + [("evaluate", name), ("end_scf",), ("stop",)])
     car = rec["carrier"]
+    assert car["mixer_reset"] is True and "new SCF" in rec["start"]
     assert rec["status"] == "ok" and car["kind"] == "pbe-scaffold" and car["functional"] == "PBE" and car["iterations"] == 2
     assert car["bootstrap"]["mix_coef"] == 1.0 and car["mixing_beta"] == 0.3 and len(car["history"]) == 2 and rec["iterations"] == 3
     assert all(h["t_iter_s"] >= h["t_hook_s"] >= 0 for h in car["history"] + rec["history"]) and "XC-free" in rec["start"]
@@ -100,3 +103,11 @@ def test_pbe_scaffold(fake, tmp_path, name):
 def test_pbe_scaffold_refuses_carrier_beta(fake, tmp_path):
     with pytest.raises(ValueError, match="carrier_beta"):
         D.run_hooked(_case("pbe-scaffold"), "PBE", str(tmp_path), SerialComm(), carrier_beta=0.1)
+
+
+def test_pbe_scaffold_stale_keeps_the_history(fake, tmp_path):
+    """The diagnostic start: the behaviour until 143eca6 (no end_scf between the phases)."""
+    rec = D.run_hooked(_case("pbe-scaffold-stale"), "r2SCAN", str(tmp_path), SerialComm(), npool=4)
+    boot = [("set_potentials", 0.0, 0.0, 0.0), ("diagonalize",), ("mix", 1.0)]
+    assert LOG == ([("session", "TPSS", 4, "")] + boot + HOOK("PBE") * 2 + HOOK("r2SCAN") * 3 + [("evaluate", "r2SCAN"), ("end_scf",), ("stop",)])
+    assert rec["carrier"]["mixer_reset"] is False and rec["carrier"]["kind"] == "pbe-scaffold-stale" and "kept" in rec["start"]

@@ -65,7 +65,7 @@ def test_start_setting():
     from xcsb.bench.structures import bcc, rocksalt
     from xcsb.host.qe import Case
     from xcsb.scf import settings
-    assert settings.STARTS == ("tpss-carrier", "pbe-scaffold") and settings.SCAFFOLD_FUNCTIONAL == "PBE"
+    assert settings.STARTS == ("tpss-carrier", "pbe-scaffold", "pbe-scaffold-stale") and settings.SCAFFOLD_FUNCTIONAL == "PBE"
     assert Case(rocksalt("Mg", "O", 7.9), ecutwfc=40.0).start == "tpss-carrier"          # every earlier study: unchanged
     assert get_case("MgO-80-k8").start == "tpss-carrier" and get_case("MgO-80-k8").as_dict()["start"] == "tpss-carrier"
     with pytest.raises(ValueError, match="start"):
@@ -349,3 +349,24 @@ def test_scan_table_bank(tmp_path):
     ts = L.tasks(run)
     k = L.cost_scale(run, ts)
     assert 0 < k < 1 and ts[0]["est_s"] == pytest.approx(k * L.estimate_s(ts[0])) and t["timing"]["cost_scale"] == pytest.approx(k)
+
+
+def test_mix_cases(tmp_path):
+    runs = L.mix_runs()
+    assert len(runs) == 2 * len(L.MIX_POINTS) == len(set(runs)) and L.nk_irreducible(L.MIX_K) >= L.NPOOL
+    c, ref = get_case("LC-mix-NaCl-m1-k10-reset"), get_case("LC-NaCl-m1")
+    assert c.kmesh == (10, 10, 10) and c.start == "pbe-scaffold" and get_case("LC-mix-NaCl-m1-k10-stale").start == "pbe-scaffold-stale"
+    assert {k: v for k, v in c.as_dict().items() if k != "kmesh"} == {k: v for k, v in ref.as_dict().items() if k != "kmesh"}
+    with pytest.raises(KeyError):
+        L.parse_mix("LC-mix-NaCl-m1-k10-warm")
+    t = L.mix_summary(str(tmp_path))
+    assert all(r["status"] == "missing" for r in t["rows"]) and "frozen" in L.render_mix(t)
+    case, f = runs[0]
+    from xcsb.tiers import run_dir
+    d = run_dir(L.scf_root(str(tmp_path)), case, "hooked", f)
+    os.makedirs(d)
+    h = [{"iter": i + 1, "etot_ry": -1.0 - 1e-6 * i, "dr2": 1e-3, "e_xc_ry": -5.0 - (0.01 if i >= 9 else 1e-6 * i), "min_rho": [1e-3, 1e-3]}
+         for i in range(12)]
+    json.dump({"status": "ok", "history": h, "carrier": {"iterations": 14}, "seconds": 9.0}, open(os.path.join(d, "record.json"), "w"))
+    r = L.mix_entry(str(tmp_path), case, f)
+    assert r["frozen_after_first"] == 8 and r["iterations"] == 12 and r["status"] == "ok" and abs(r["etot_spread_last3_ry"] - 2e-6) < 1e-12
