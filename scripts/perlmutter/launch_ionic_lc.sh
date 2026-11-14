@@ -25,6 +25,7 @@ case $WHAT in
   diag)  STAGES=diag; RUN=$DIAG; T=00:30:00; AS=1800;;
   mix)   STAGES=mix; RUN=${XCSB_LC_MIX:-$W/runs/xcsb/2026-11-13_ionic_lc_mix}; T=00:45:00; AS=2700;;
   resp)  STAGES=resp; RUN=${XCSB_LC_RESP:-$W/runs/xcsb/2026-11-14_lif_response}; T=02:00:00; AS=7200;;
+  xfloor) STAGES=xfloor; RUN=${XCSB_LC_RESP:-$W/runs/xcsb/2026-11-14_lif_response}; T=00:30:00; AS=1800;;
   ref)   STAGES=R,RX;;
   model) STAGES=M,MX;;
   all)   STAGES=R,RX,M,MX;;
@@ -35,7 +36,7 @@ LOG="$RUN/launch_tries.txt"
 C=$(git -C $W/xcSolidsBench.git rev-parse main)
 REPO=$W/src/xcSolidsBench-lc-${C:0:8}
 if [ ! -d "$REPO" ]; then git clone -q $W/xcSolidsBench.git "$REPO" && git -C "$REPO" checkout -q "$C"; fi
-[ -f "$REPO/scripts/perlmutter/job_lif_response.sh" ] || { echo "no job_ionic_lc_diag.sh in $REPO (commit $C): push main to the perlmutter remote" | tee -a "$LOG"; exit 1; }
+[ -f "$REPO/scripts/perlmutter/job_lif_xfloor.sh" ] || { echo "no job_ionic_lc_diag.sh in $REPO (commit $C): push main to the perlmutter remote" | tee -a "$LOG"; exit 1; }
 APIN=$(cd "$REPO" && python3 -c "import re; s = open('src/xcsb/functional/xchole.py').read(); m = re.search(r'\"v3.2\": \"([0-9a-f]{40})\"', s); print(m.group(1) if m else '')")
 PIN=${2:-$APIN}
 [ -n "$PIN" ] && [ "$PIN" = "$APIN" ] || { echo "xchole pin '$PIN' is not the adapter's v3.2 pin '$APIN' of $C" | tee -a "$LOG"; exit 1; }
@@ -55,6 +56,7 @@ for try in $(seq 1 12); do
   out="$RUN/job_$(date +%Y%m%dT%H%M%S)_${WHAT}_try$try.out"
   if [ $WHAT = diag ]; then CMD="bash scripts/perlmutter/job_ionic_lc_diag.sh $RUN $PIN"
   elif [ $WHAT = mix ]; then CMD="bash scripts/perlmutter/job_ionic_lc_mix.sh $RUN $PIN"
+  elif [ $WHAT = xfloor ]; then CMD="bash scripts/perlmutter/job_lif_xfloor.sh $RUN $PIN"
   elif [ $WHAT = resp ]; then CMD="bash scripts/perlmutter/job_lif_response.sh $RUN $PIN"
   else CMD="bash scripts/perlmutter/job_ionic_lc.sh $RUN $STAGES $PIN $DIAG"; fi
   XCSB_ALLOC_S=$AS salloc -N 1 -C cpu -q interactive -t $T -A $ACCOUNT --job-name xcsb_lc_$WHAT \

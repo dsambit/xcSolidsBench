@@ -116,3 +116,111 @@ def render(t) -> str:
             out.append(f"| {r['name']} |  |  |  |  | {r.get('error') or 'incomplete'} |")
     out += ["", "Points: " + ", ".join(f"{p['step']:+d} %: {p['status']}" for p in t["points"])]
     return "\n".join(out) + "\n"
+
+
+# ---- the exchange outer-switch floor (user 2026-11-14) ------------------------------------------------------------------------------
+# Lever: let the exchange outer switch keep a nonzero iso-orbital weight at the uniform-gas end, w' = w0 + (1 - w0) w (breaks
+# GE2X and GE4X; the uniform-gas limit itself unless the iso-orbital exchange equals LDA there: 'ueg_point' below measures it).
+# At a frozen density the energy is linear in w0: E(w0) = E + w0 I, I = sum_sigma int (1 - w) (e_iso - e_UEG). The post below
+# returns I and the pieces on the converged density (serial on the root).
+XFLOOR_TAG = "xfloor"
+XFLOOR_W0 = (0.0, 0.1, 0.2, 0.3, 0.5, 1.0)
+
+
+def xfloor_post(functional_name):
+    def post(grid, rho, tau):
+        import jax
+        import jax.numpy as jnp
+        from xchole.sch_si.exchange import spin_pieces
+        from ..functional import get
+        from ..host.evaluate import point_inputs
+        f = get(functional_name)
+        Pm = f._model.P
+        x, _ = point_inputs(grid, rho, tau, True, True)
+
+        def k(r, g, t, l):
+            ex, pc = spin_pieces(r, g, t, l, Pm)
+            e_iso = (1 - pc["gs"]) * pc["e_br"] + pc["gs"] * pc["e_sh"]
+            return ex, pc["w"], pc["gs"], e_iso, pc["e_def"]
+        kj = jax.jit(k)
+        w8 = grid.weight
+        ry = lambda a: 2.0 * w8 * float(np.sum(a))          # noqa: E731
+        out = {"functional": functional_name, "I_ry": 0.0, "E_x_ry": 0.0, "E_x_iso_only_ry": 0.0, "E_x_ueg_only_ry": 0.0,
+               "X_iso_ry": 0.0, "X_ueg_ry": 0.0}
+        nw = dw = 0.0
+        hist = np.zeros(10)
+        for sp in (0, 1):
+            ex, w, gs, e_iso, e_def = (np.asarray(a) for a in kj(x.rho[sp], x.grad[sp], x.tau[sp], x.lapl[sp]))
+            out["I_ry"] += ry((1 - w) * (e_iso - e_def))
+            out["E_x_ry"] += ry(ex)
+            out["E_x_iso_only_ry"] += ry(e_iso)
+            out["E_x_ueg_only_ry"] += ry(e_def)
+            out["X_iso_ry"] += ry(w * e_iso)
+            out["X_ueg_ry"] += ry((1 - w) * e_def)
+            nw += float(np.sum(x.rho[sp] * w)); dw += float(np.sum(x.rho[sp]))
+            hist += np.histogram(w, bins=10, range=(0.0, 1.0), weights=x.rho[sp])[0]
+        out["rho_weighted_mean_w_x"] = nw / dw
+        out["electron_fraction_by_w_x_decile"] = (hist / hist.sum()).tolist()
+        # the uniform gas (per spin density n / 2, grad = lapl = 0, tau = tau_unif): iso-orbital exchange relative to the UEG end
+        ueg = {}
+        for rs in (0.5, 1.0, 2.0, 5.0):
+            r = jnp.array([0.5 * 3.0 / (4.0 * np.pi * rs ** 3)])
+            t = 0.3 * (6.0 * np.pi ** 2) ** (2.0 / 3.0) * r ** (5.0 / 3.0)
+            ex, w, gs, e_iso, e_def = (float(np.asarray(a)[0]) for a in kj(r, jnp.zeros((3, 1)), t, jnp.zeros(1)))
+            ueg[f"rs{rs:g}"] = {"e_iso_over_e_ueg": e_iso / e_def, "w_x": w, "shell_weight": gs,
+                                "e_ueg_over_lda": e_def / (-0.75 * (3.0 / np.pi) ** (1.0 / 3.0) * 2.0 ** (1.0 / 3.0) * float(r[0]) ** (4.0 / 3.0))}
+        out["ueg_point"] = ueg
+        return out
+    return post
+
+
+def xfloor_command(run, step):
+    return ["scf", "--case", case_name(step), "--mode", "hooked", "--name", BASE, "--root", L.scf_root(run), "--npool", str(L.NPOOL),
+            "--tag", XFLOOR_TAG, "--xfloor-diag"]
+
+
+def xfloor_summary(run):
+    from ..bench.eos import bm3_fit
+    from ..bench.structures import BOHR_PER_ANGSTROM
+    from ..tiers import run_dir
+    pts = []
+    for s in STEPS:
+        p = os.path.join(run_dir(L.scf_root(run), case_name(s), "hooked", BASE) + "__" + XFLOOR_TAG, "record.json")
+        r = json.load(open(p)) if os.path.exists(p) else None
+        if r is None or r.get("status") != "ok" or "I_ry" not in r.get("post", {}).get("xfloor", {}):
+            pts.append({"step": s, "status": "missing" if r is None else r.get("status"),
+                        "error": None if r is None else (r.get("error") or r.get("post", {}).get("xfloor", {}).get("error"))})
+            continue
+        pts.append(dict(r["post"]["xfloor"], step=s, status="ok", a_angstrom=L.A_REF[SOLID] * (1 + s / 100.0), V_bohr3=L.volume(SOLID, s),
+                        etot_ry=r["energies_ry"]["etot"]))
+    ok = [p for p in pts if p["status"] == "ok"]
+    rows = []
+    for w0 in XFLOOR_W0:
+        row = {"w0": w0, "etot_ry": [p["etot_ry"] + w0 * p["I_ry"] for p in ok]}
+        if len(ok) >= 4:
+            ft = bm3_fit(np.array([p["V_bohr3"] for p in ok]), np.array(row["etot_ry"]), guard=False)
+            row.update(a0_angstrom=(4 * ft["V0_bohr3"]) ** (1 / 3) / BOHR_PER_ANGSTROM, B0_GPa=ft["B0_GPa"], inside=ft["v0_inner_two_thirds"])
+        rows.append(row)
+    return {"what": "LiF: exchange outer-switch floor w' = w0 + (1 - w0) w, frozen-density estimate (bare, no D4)", "base": BASE,
+            "a_ref_angstrom": L.A_REF[SOLID], "points": pts, "rows": rows}
+
+
+def render_xfloor(t) -> str:
+    out = [f"# {t['what']}", "", "| step (%) | E_tot (Ry) | I (Ry) | E_x (Ry) | E_x iso only | E_x UEG only | mean w_x |", "|---|---|---|---|---|---|---|"]
+    for p in t["points"]:
+        if p["status"] == "ok":
+            out.append(f"| {p['step']:+d} | {p['etot_ry']:.6f} | {p['I_ry']:+.6f} | {p['E_x_ry']:.5f} | {p['E_x_iso_only_ry']:.5f} | "
+                       f"{p['E_x_ueg_only_ry']:.5f} | {p['rho_weighted_mean_w_x']:.3f} |")
+        else:
+            out.append(f"| {p['step']:+d} | {p['status']}: {p.get('error')} | | | | | |")
+    out += ["", "| w0 | a0 (A) | a0 - a_ref (%) | B0 (GPa) |", "|---|---|---|---|"]
+    for r in t["rows"]:
+        if "a0_angstrom" in r:
+            out.append(f"| {r['w0']:g} | {r['a0_angstrom']:.4f} | {100 * (r['a0_angstrom'] / t['a_ref_angstrom'] - 1):+.2f} | {r['B0_GPa']:.1f} |"
+                       + ("" if r["inside"] else " (minimum near the scan edge)"))
+    ok = [p for p in t["points"] if p["status"] == "ok"]
+    if ok:
+        out += ["", "Uniform gas, iso-orbital exchange / UEG-end exchange: " + ", ".join(
+            f"{k}: {v['e_iso_over_e_ueg']:.4f} (w_x {v['w_x']:.3f}, UEG end / LDA {v['e_ueg_over_lda']:.4f})" for k, v in ok[0]["ueg_point"].items()),
+            "", "Electron fraction by w_x decile at step " + f"{ok[0]['step']:+d} %: " + ", ".join(f"{v:.3f}" for v in ok[0]["electron_fraction_by_w_x_decile"])]
+    return "\n".join(out) + "\n"
