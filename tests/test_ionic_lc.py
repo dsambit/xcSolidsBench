@@ -207,7 +207,7 @@ def test_tasks(tmp_path):
 def test_model_sets_are_the_v32_line():
     from xcsb.functional import XCHOLE_NAMES, xchole
     assert set(L.MODELS) == set(xchole.RECORDS_BY_VERSION["v3.2"]) and set(L.MODELS) <= set(XCHOLE_NAMES)
-    assert xchole.XCHOLE_PINS[L.XCHOLE_LINE] == "11522d353c572ac8019a71f76925ba2ea56c0de1"
+    assert xchole.XCHOLE_PINS[L.XCHOLE_LINE] == "22df4b5e439873febe9ae4ffd933c09c5229dfbf"
     assert xchole.LINE_VERSION[L.XCHOLE_LINE] == "v3.2" and set(xchole.LINE_VERSION) == set(xchole.XCHOLE_PINS)
 
 

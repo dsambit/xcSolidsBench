@@ -229,10 +229,11 @@ def render_xfloor(t) -> str:
 # ---- the named exchange variants of strongxc-v3 explore/lif_lattice/exvar.py (user 2026-11-14) -----------------------------------
 # GE2X-corrected iso-orbital exchange (phi), with the switch's zero moved (u0), the monotone switch (a_mono) or a floor (w0):
 # E_x of each named candidate on the converged density, serial on the root; E_tot^var = E_tot + E_x^var - E_x (first order).
-EXVAR_TAG = "exvar3"
+EXVAR_TAG = "exvar4"
 # candidates already evaluated (jobs 61283533, 61285049; exvar_summary_run1/run2 in the run dir): the GE2X-corrected phi family
 EXVAR_DONE = ("phi", "phi0", "phi_w0.25", "phi_w0.5", "phi_u1.4625", "phi_u2.211", "phi_mono3", "phi_mono1", "phi0_mono1",
-              "phi_iso", "phi0_iso")
+              "phi_iso", "phi0_iso",
+              "phic0.75", "phic1", "w0.25", "w0.5", "iso", "u1.4625", "u2.211", "mono3", "mono1")       # run 3 (exvar3)
 
 
 def exvar_post(functional_name):
@@ -264,7 +265,7 @@ def exvar_post(functional_name):
             wj = jax.jit(lambda r, g, t, l, var=var: V.pieces(r, g, t, l, Pm, var)[1]["w"])
             nw = sum(float(np.sum(x.rho[sp] * np.asarray(wj(x.rho[sp], x.grad[sp], x.tau[sp], x.lapl[sp])))) for sp in (0, 1))
             out["rho_weighted_mean_w_x"][name] = nw / float(np.sum(x.rho))
-        ref = "w0.5" if "w0.5" in out["E_x_ry"] else "phi_w0.5"
+        ref = [k for k in out["E_x_ry"] if k != "installed"][0]
         dx = out["E_x_ry"][ref] - out["E_x_ry"]["installed"]
         out["mean_Lambda_prime_weighted_by_exchange_change"] = -(out["E_c_ry"][ref] - out["E_c_ry"]["installed"]) / dx
         out["variants"] = {k: dict(v) for k, v in V.NAMED.items()}
