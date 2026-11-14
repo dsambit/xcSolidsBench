@@ -43,7 +43,9 @@ XCHOLE_PINS = {                                              # line -> pinned xc
     # strongxc-v3 019c8acd6 (user 2026-11-13, the ionic lattice constants): the v3.2 sets SCH-SI-A:v3.2, SCH-SI-B:v3.2, which
     # REPLACE v3.1 there (no v3.1 records at this pin; the adapter-facing API params.of_record / candidate_params /
     # jax_si.ModelXC_SCHSI / jax_sc.sc_dict is unchanged against 0e9e8ee28; no explore/xc_pairing or spin_balance use)
-    "v3.2": "019c8acd65a7ee2d71f59d750338415e73695ec1",
+    # 2026-11-14: 019c8acd6 -> 89eb63ff5 (strongxc-v3; src/ identical, `git diff 019c8acd6 89eb63ff5 -- src` empty; adds
+    # explore/lif_lattice/exvar.py, read by studies.lif_response)
+    "v3.2": "89eb63ff57fc34475b68630e10d6784a9d63b818",
 }
 XCHOLE_LINE = os.environ.get("XCSB_XCHOLE_LINE", "v3.1")
 if XCHOLE_LINE not in XCHOLE_PINS:
@@ -182,6 +184,20 @@ def parse_variant(name: str):
         k, _, v = item.partition("=")
         edits[k.strip()] = float(v)
     return base, edits
+
+
+def lif_exvar():
+    """explore/lif_lattice/exvar.py of the pinned tree (the exchange variants of the LiF exploration; read-only xchole use)."""
+    import_pinned_xchole()
+    d = os.path.join(os.path.dirname(os.path.abspath(os.environ["XCSB_XCHOLE_SRC"])), "explore", "lif_lattice")
+    if not os.path.exists(os.path.join(d, "exvar.py")):
+        raise XcholePinError(f"{d}/exvar.py missing in the pinned tree")
+    if d not in sys.path:
+        sys.path.insert(0, d)
+    import exvar
+    if not os.path.abspath(exvar.__file__).startswith(d + os.sep):
+        raise XcholePinError(f"imported exvar from {exvar.__file__}, not from {d}")
+    return exvar
 
 
 def xc_pairing_reference():

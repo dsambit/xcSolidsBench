@@ -224,3 +224,77 @@ def render_xfloor(t) -> str:
             f"{k}: {v['e_iso_over_e_ueg']:.4f} (w_x {v['w_x']:.3f}, UEG end / LDA {v['e_ueg_over_lda']:.4f})" for k, v in ok[0]["ueg_point"].items()),
             "", "Electron fraction by w_x decile at step " + f"{ok[0]['step']:+d} %: " + ", ".join(f"{v:.3f}" for v in ok[0]["electron_fraction_by_w_x_decile"])]
     return "\n".join(out) + "\n"
+
+
+# ---- the named exchange variants of strongxc-v3 explore/lif_lattice/exvar.py (user 2026-11-14) -----------------------------------
+# GE2X-corrected iso-orbital exchange (phi), with the switch's zero moved (u0), the monotone switch (a_mono) or a floor (w0):
+# E_x of each named candidate on the converged density, serial on the root; E_tot^var = E_tot + E_x^var - E_x (first order).
+EXVAR_TAG = "exvar"
+
+
+def exvar_post(functional_name):
+    def post(grid, rho, tau):
+        import jax
+        from ..functional import get
+        from ..functional.xchole import lif_exvar
+        from ..host.evaluate import point_inputs
+        V = lif_exvar()
+        Pm = get(functional_name)._model.P
+        x, _ = point_inputs(grid, rho, tau, True, True)
+        w8 = grid.weight
+        out = {"functional": functional_name, "E_x_ry": {}, "rho_weighted_mean_w_x": {}}
+        for name, var in dict({"installed": {}}, **V.NAMED).items():
+            kj = jax.jit(lambda r, g, t, l, var=var: V.pieces(r, g, t, l, Pm, var))
+            e = nw = dw = 0.0
+            for sp in (0, 1):
+                ex, pc = kj(x.rho[sp], x.grad[sp], x.tau[sp], x.lapl[sp])
+                e += 2.0 * w8 * float(np.sum(np.asarray(ex)))
+                nw += float(np.sum(x.rho[sp] * np.asarray(pc["w"]))); dw += float(np.sum(x.rho[sp]))
+            out["E_x_ry"][name] = e
+            out["rho_weighted_mean_w_x"][name] = nw / dw
+        out["variants"] = {k: dict(v) for k, v in V.NAMED.items()}
+        return out
+    return post
+
+
+def exvar_command(run, step):
+    return ["scf", "--case", case_name(step), "--mode", "hooked", "--name", BASE, "--root", L.scf_root(run), "--npool", str(L.NPOOL),
+            "--tag", EXVAR_TAG, "--exvar-diag"]
+
+
+def exvar_summary(run):
+    from ..bench.eos import bm3_fit
+    from ..bench.structures import BOHR_PER_ANGSTROM
+    from ..tiers import run_dir
+    pts = []
+    for s in STEPS:
+        p = os.path.join(run_dir(L.scf_root(run), case_name(s), "hooked", BASE) + "__" + EXVAR_TAG, "record.json")
+        r = json.load(open(p)) if os.path.exists(p) else None
+        d = (r or {}).get("post", {}).get("exvar", {})
+        if r is None or r.get("status") != "ok" or "E_x_ry" not in d:
+            pts.append({"step": s, "status": "missing" if r is None else r.get("status"), "error": None if r is None else (r.get("error") or d.get("error"))})
+            continue
+        pts.append(dict(d, step=s, status="ok", a_angstrom=L.A_REF[SOLID] * (1 + s / 100.0), V_bohr3=L.volume(SOLID, s), etot_ry=r["energies_ry"]["etot"]))
+    ok = [p for p in pts if p["status"] == "ok"]
+    rows = []
+    for name in (list(ok[0]["E_x_ry"]) if ok else []):
+        row = {"name": name, "variant": ok[0]["variants"].get(name, {}), "mean_w_x": ok[0]["rho_weighted_mean_w_x"][name],
+               "etot_ry": [p["etot_ry"] + p["E_x_ry"][name] - p["E_x_ry"]["installed"] for p in ok]}
+        if len(ok) >= 4:
+            ft = bm3_fit(np.array([p["V_bohr3"] for p in ok]), np.array(row["etot_ry"]), guard=False)
+            row.update(a0_angstrom=(4 * ft["V0_bohr3"]) ** (1 / 3) / BOHR_PER_ANGSTROM, B0_GPa=ft["B0_GPa"], inside=ft["v0_inner_two_thirds"])
+        rows.append(row)
+    return {"what": "LiF: named exchange variants (strongxc-v3 explore/lif_lattice/exvar.py), frozen-density estimate (bare, no D4)", "base": BASE,
+            "a_ref_angstrom": L.A_REF[SOLID], "points": pts, "rows": rows}
+
+
+def render_exvar(t) -> str:
+    out = [f"# {t['what']}", "", "| variant | mean w_x | a0 (A) | a0 - a_ref (%) | B0 (GPa) | E_x - E_x(installed) at the first point (mRy) |", "|---|---|---|---|---|---|"]
+    ok = [p for p in t["points"] if p["status"] == "ok"]
+    for r in t["rows"]:
+        if "a0_angstrom" in r:
+            d = 1e3 * (ok[0]["E_x_ry"][r["name"]] - ok[0]["E_x_ry"]["installed"])
+            out.append(f"| {r['name']} | {r['mean_w_x']:.3f} | {r['a0_angstrom']:.4f} | {100 * (r['a0_angstrom'] / t['a_ref_angstrom'] - 1):+.2f} | "
+                       f"{r['B0_GPa']:.1f} | {d:+.2f} |" + ("" if r["inside"] else " (minimum near the scan edge)"))
+    out += ["", "Points: " + ", ".join(f"{p['step']:+d} %: {p['status']}" + (f" ({p['error']})" if p.get("error") else "") for p in t["points"])]
+    return "\n".join(out) + "\n"

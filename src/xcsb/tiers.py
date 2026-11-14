@@ -107,7 +107,7 @@ def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None =
         npool: int = 1, ripple: str | None = None, m1_diag: bool = False, e1_diag: bool = False, tmo_diag: bool = False,
         warm_from: str | None = None,
         warm_label: str | None = None, warm_mode: str | None = None, sb_diag: bool = False, carrier_beta: float | None = None,
-        frozen: list | None = None, xfloor_diag: bool = False):
+        frozen: list | None = None, xfloor_diag: bool = False, exvar_diag: bool = False):
     """mode 'native': QE's input_dft = name (host_check: a libxc name for the host E_xc of the native density);
     mode 'hooked': the functional `name` through the hooks. Writes <out>/record.json."""
     from mpi4py import MPI
@@ -165,6 +165,9 @@ def scf(case_name: str, mode: str, name: str, out: str, host_check: str | None =
             if tmo_diag:
                 from .studies.tmo_gap import post_moments
                 posts.append(("tmo", post_moments(case_name)))
+            if exvar_diag:
+                from .studies.lif_response import exvar_post
+                posts.append(("exvar", exvar_post(name)))
             if xfloor_diag:
                 from .studies.lif_response import xfloor_post
                 posts.append(("xfloor", xfloor_post(name)))
