@@ -229,7 +229,10 @@ def render_xfloor(t) -> str:
 # ---- the named exchange variants of strongxc-v3 explore/lif_lattice/exvar.py (user 2026-11-14) -----------------------------------
 # GE2X-corrected iso-orbital exchange (phi), with the switch's zero moved (u0), the monotone switch (a_mono) or a floor (w0):
 # E_x of each named candidate on the converged density, serial on the root; E_tot^var = E_tot + E_x^var - E_x (first order).
-EXVAR_TAG = "exvar2"
+EXVAR_TAG = "exvar3"
+# candidates already evaluated (jobs 61283533, 61285049; exvar_summary_run1/run2 in the run dir): the GE2X-corrected phi family
+EXVAR_DONE = ("phi", "phi0", "phi_w0.25", "phi_w0.5", "phi_u1.4625", "phi_u2.211", "phi_mono3", "phi_mono1", "phi0_mono1",
+              "phi_iso", "phi0_iso")
 
 
 def exvar_post(functional_name):
@@ -252,7 +255,7 @@ def exvar_post(functional_name):
         d = (x.rho[0], x.rho[1], x.grad[0], x.grad[1], x.tau[0], x.tau[1], x.lapl[0], x.lapl[1], x.hess[0], x.hess[1])
         out = {"functional": functional_name, "E_xc_ry": {}, "E_x_ry": {}, "E_c_ry": {}, "rho_weighted_mean_w_x": {},
                "convention": "Lambda' reads the variant's exchange (exvar.exc_si_variant)"}
-        for name, var in dict({"installed": {}}, **V.NAMED).items():
+        for name, var in dict({"installed": {}}, **{k: v for k, v in V.NAMED.items() if k not in EXVAR_DONE}).items():
             kj = jax.jit(lambda *a, var=var: V.exc_si_variant(*a, Pm, Pc, S, si, var))
             ex, ec = (np.asarray(a) for a in kj(*d))
             out["E_x_ry"][name] = 2.0 * w8 * float(np.sum(ex))
@@ -261,8 +264,9 @@ def exvar_post(functional_name):
             wj = jax.jit(lambda r, g, t, l, var=var: V.pieces(r, g, t, l, Pm, var)[1]["w"])
             nw = sum(float(np.sum(x.rho[sp] * np.asarray(wj(x.rho[sp], x.grad[sp], x.tau[sp], x.lapl[sp])))) for sp in (0, 1))
             out["rho_weighted_mean_w_x"][name] = nw / float(np.sum(x.rho))
-        dx = out["E_x_ry"]["phi_w0.5"] - out["E_x_ry"]["installed"]
-        out["mean_Lambda_prime_weighted_by_exchange_change"] = -(out["E_c_ry"]["phi_w0.5"] - out["E_c_ry"]["installed"]) / dx
+        ref = "w0.5" if "w0.5" in out["E_x_ry"] else "phi_w0.5"
+        dx = out["E_x_ry"][ref] - out["E_x_ry"]["installed"]
+        out["mean_Lambda_prime_weighted_by_exchange_change"] = -(out["E_c_ry"][ref] - out["E_c_ry"]["installed"]) / dx
         out["variants"] = {k: dict(v) for k, v in V.NAMED.items()}
         return out
     return post

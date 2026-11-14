@@ -26,7 +26,7 @@ case $WHAT in
   mix)   STAGES=mix; RUN=${XCSB_LC_MIX:-$W/runs/xcsb/2026-11-13_ionic_lc_mix}; T=00:45:00; AS=2700;;
   resp)  STAGES=resp; RUN=${XCSB_LC_RESP:-$W/runs/xcsb/2026-11-14_lif_response}; T=02:00:00; AS=7200;;
   xfloor) STAGES=xfloor; RUN=${XCSB_LC_RESP:-$W/runs/xcsb/2026-11-14_lif_response}; T=00:30:00; AS=1800;;
-  exvar) STAGES=exvar; RUN=${XCSB_LC_RESP:-$W/runs/xcsb/2026-11-14_lif_response}; T=00:30:00; AS=1800;;
+  exvar) STAGES=exvar; RUN=${XCSB_LC_RESP:-$W/runs/xcsb/2026-11-14_lif_response}; T=01:30:00; AS=5400;;
   ref)   STAGES=R,RX;;
   model) STAGES=M,MX;;
   all)   STAGES=R,RX,M,MX;;

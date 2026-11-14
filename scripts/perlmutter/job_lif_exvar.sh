@@ -23,7 +23,7 @@ export OMP_PLACES=cores OMP_PROC_BIND=close OMP_NUM_THREADS=1
 n=0
 for step in $(python -c "from xcsb.studies import lif_response as R; print(' '.join(map(str, R.STEPS)))"); do
   args=$(python -c "from xcsb.studies import lif_response as R; print(' '.join(R.exvar_command('$RUN', $step)))")
-  ( timeout --signal=TERM --kill-after=30 1200 srun -N 1 -n 32 -c 2 --exact --cpu-bind=cores python -m xcsb.cli $args \
+  ( timeout --signal=TERM --kill-after=30 2400 srun -N 1 -n 32 -c 2 --exact --cpu-bind=cores python -m xcsb.cli $args \
       < /dev/null > "$RUN/logs/exvar_$step.log" 2>&1; echo "  exvar step $step rc=$? $(date -Is)" >> "$SUM" ) &
   n=$(( n + 1 ))
   [ $(( n % 4 )) -eq 0 ] && wait
