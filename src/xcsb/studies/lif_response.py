@@ -229,29 +229,40 @@ def render_xfloor(t) -> str:
 # ---- the named exchange variants of strongxc-v3 explore/lif_lattice/exvar.py (user 2026-11-14) -----------------------------------
 # GE2X-corrected iso-orbital exchange (phi), with the switch's zero moved (u0), the monotone switch (a_mono) or a floor (w0):
 # E_x of each named candidate on the converged density, serial on the root; E_tot^var = E_tot + E_x^var - E_x (first order).
-EXVAR_TAG = "exvar"
+EXVAR_TAG = "exvar2"
 
 
 def exvar_post(functional_name):
+    """E_xc of each named candidate on the converged density through exvar.exc_si_variant: the variant's exchange in the energy
+    AND in Lambda' (e_T - e_x - e_c), so the spin-independent strong-correlation limit is kept (user 2026-11-14)."""
     def post(grid, rho, tau):
         import jax
+        from xchole.core import jax_model as jm
         from ..functional import get
         from ..functional.xchole import lif_exvar
         from ..host.evaluate import point_inputs
         V = lif_exvar()
-        Pm = get(functional_name)._model.P
+        f = get(functional_name)
+        Pm = f._model.P
+        Pc = jm._cparams(Pm)
+        S = dict(f._S, Px=Pm)
+        si = {k: float(v) for k, v in f._si.items()}
         x, _ = point_inputs(grid, rho, tau, True, True)
         w8 = grid.weight
-        out = {"functional": functional_name, "E_x_ry": {}, "rho_weighted_mean_w_x": {}}
+        d = (x.rho[0], x.rho[1], x.grad[0], x.grad[1], x.tau[0], x.tau[1], x.lapl[0], x.lapl[1], x.hess[0], x.hess[1])
+        out = {"functional": functional_name, "E_xc_ry": {}, "E_x_ry": {}, "E_c_ry": {}, "rho_weighted_mean_w_x": {},
+               "convention": "Lambda' reads the variant's exchange (exvar.exc_si_variant)"}
         for name, var in dict({"installed": {}}, **V.NAMED).items():
-            kj = jax.jit(lambda r, g, t, l, var=var: V.pieces(r, g, t, l, Pm, var))
-            e = nw = dw = 0.0
-            for sp in (0, 1):
-                ex, pc = kj(x.rho[sp], x.grad[sp], x.tau[sp], x.lapl[sp])
-                e += 2.0 * w8 * float(np.sum(np.asarray(ex)))
-                nw += float(np.sum(x.rho[sp] * np.asarray(pc["w"]))); dw += float(np.sum(x.rho[sp]))
-            out["E_x_ry"][name] = e
-            out["rho_weighted_mean_w_x"][name] = nw / dw
+            kj = jax.jit(lambda *a, var=var: V.exc_si_variant(*a, Pm, Pc, S, si, var))
+            ex, ec = (np.asarray(a) for a in kj(*d))
+            out["E_x_ry"][name] = 2.0 * w8 * float(np.sum(ex))
+            out["E_c_ry"][name] = 2.0 * w8 * float(np.sum(ec))
+            out["E_xc_ry"][name] = out["E_x_ry"][name] + out["E_c_ry"][name]
+            wj = jax.jit(lambda r, g, t, l, var=var: V.pieces(r, g, t, l, Pm, var)[1]["w"])
+            nw = sum(float(np.sum(x.rho[sp] * np.asarray(wj(x.rho[sp], x.grad[sp], x.tau[sp], x.lapl[sp])))) for sp in (0, 1))
+            out["rho_weighted_mean_w_x"][name] = nw / float(np.sum(x.rho))
+        dx = out["E_x_ry"]["phi_w0.5"] - out["E_x_ry"]["installed"]
+        out["mean_Lambda_prime_weighted_by_exchange_change"] = -(out["E_c_ry"]["phi_w0.5"] - out["E_c_ry"]["installed"]) / dx
         out["variants"] = {k: dict(v) for k, v in V.NAMED.items()}
         return out
     return post
@@ -271,15 +282,15 @@ def exvar_summary(run):
         p = os.path.join(run_dir(L.scf_root(run), case_name(s), "hooked", BASE) + "__" + EXVAR_TAG, "record.json")
         r = json.load(open(p)) if os.path.exists(p) else None
         d = (r or {}).get("post", {}).get("exvar", {})
-        if r is None or r.get("status") != "ok" or "E_x_ry" not in d:
+        if r is None or r.get("status") != "ok" or "E_xc_ry" not in d:
             pts.append({"step": s, "status": "missing" if r is None else r.get("status"), "error": None if r is None else (r.get("error") or d.get("error"))})
             continue
         pts.append(dict(d, step=s, status="ok", a_angstrom=L.A_REF[SOLID] * (1 + s / 100.0), V_bohr3=L.volume(SOLID, s), etot_ry=r["energies_ry"]["etot"]))
     ok = [p for p in pts if p["status"] == "ok"]
     rows = []
-    for name in (list(ok[0]["E_x_ry"]) if ok else []):
+    for name in (list(ok[0]["E_xc_ry"]) if ok else []):
         row = {"name": name, "variant": ok[0]["variants"].get(name, {}), "mean_w_x": ok[0]["rho_weighted_mean_w_x"][name],
-               "etot_ry": [p["etot_ry"] + p["E_x_ry"][name] - p["E_x_ry"]["installed"] for p in ok]}
+               "etot_ry": [p["etot_ry"] + p["E_xc_ry"][name] - p["E_xc_ry"]["installed"] for p in ok]}
         if len(ok) >= 4:
             ft = bm3_fit(np.array([p["V_bohr3"] for p in ok]), np.array(row["etot_ry"]), guard=False)
             row.update(a0_angstrom=(4 * ft["V0_bohr3"]) ** (1 / 3) / BOHR_PER_ANGSTROM, B0_GPa=ft["B0_GPa"], inside=ft["v0_inner_two_thirds"])
@@ -289,12 +300,15 @@ def exvar_summary(run):
 
 
 def render_exvar(t) -> str:
-    out = [f"# {t['what']}", "", "| variant | mean w_x | a0 (A) | a0 - a_ref (%) | B0 (GPa) | E_x - E_x(installed) at the first point (mRy) |", "|---|---|---|---|---|---|"]
+    out = [f"# {t['what']}", "", "| variant | mean w_x | a0 (A) | a0 - a_ref (%) | B0 (GPa) | E_xc - E_xc(installed) at the first point (mRy) |", "|---|---|---|---|---|---|"]
     ok = [p for p in t["points"] if p["status"] == "ok"]
     for r in t["rows"]:
         if "a0_angstrom" in r:
-            d = 1e3 * (ok[0]["E_x_ry"][r["name"]] - ok[0]["E_x_ry"]["installed"])
+            d = 1e3 * (ok[0]["E_xc_ry"][r["name"]] - ok[0]["E_xc_ry"]["installed"])
             out.append(f"| {r['name']} | {r['mean_w_x']:.3f} | {r['a0_angstrom']:.4f} | {100 * (r['a0_angstrom'] / t['a_ref_angstrom'] - 1):+.2f} | "
                        f"{r['B0_GPa']:.1f} | {d:+.2f} |" + ("" if r["inside"] else " (minimum near the scan edge)"))
+    if ok:
+        out += ["", f"E_xc(installed, re-evaluated) - the SCF record's is not compared here; Lambda' averaged over the exchange change (phi_w0.5): "
+                f"{ok[0]['mean_Lambda_prime_weighted_by_exchange_change']:.3f}; convention: {ok[0]['convention']}"]
     out += ["", "Points: " + ", ".join(f"{p['step']:+d} %: {p['status']}" + (f" ({p['error']})" if p.get("error") else "") for p in t["points"])]
     return "\n".join(out) + "\n"
