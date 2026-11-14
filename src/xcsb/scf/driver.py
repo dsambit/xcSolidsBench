@@ -98,7 +98,7 @@ def run_native(case: Case, input_dft: str, workdir: str, comm, host_functional: 
 def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path: str | None = None,
                maxiter: int = settings.MAXITER, chunk: int = CHUNK, post=None, deviations: dict | None = None,
                npool: int = 1, seeds=None, warm_start: dict | None = None, previous_attempts: list | None = None,
-               carrier_beta: float | None = None) -> dict:
+               carrier_beta: float | None = None, frozen: list | None = None) -> dict:
     """post: optional diagnostic called on the root with (grid, rho, tau) of the converged density; its dict is stored
     as rec["post"] (e.g. xcsb.studies.fe_payback.attribution).
     seeds: optional ripple-seeded restarts after convergence (xcsb.studies.m1_ladder.SeedPlan): each seed overwrites QE's
@@ -274,6 +274,23 @@ def run_hooked(case: Case, functional_name: str, workdir: str, comm, record_path
                 except Exception as exc:
                     rec["post"] = {"error": f"{type(exc).__name__}: {exc}", "traceback": traceback.format_exc()}
         rec["seconds"] = time.time() - t0
+        if frozen:
+            # Frozen-density response (studies.lif_response): E_xc of other functionals / diagnostic variants on THIS converged
+            # density, collectively. E_tot[g] ~ E_tot + E_xc^g - E_xc (e_xc_final_ry) to first order in the density change.
+            rec["frozen"] = {}
+            for nm in frozen:
+                tf = time.time()
+                try:
+                    ff = get_functional(nm)
+                    rf = evaluate_on_grid(ff, s.grid, rho, tau, comm, chunk)
+                    out = {"e_xc_ry": 2 * rf.e_xc if rank == 0 else None, "provenance": ff.provenance}
+                    del ff, rf
+                except Exception as exc:
+                    out = {"error": f"{type(exc).__name__}: {exc}"}
+                out["seconds"] = time.time() - tf
+                rec["frozen"][nm] = out
+                if rank == 0:
+                    _write(record_path, rec)
         if seeds is not None:
             if rank == 0:
                 _write(record_path, rec)

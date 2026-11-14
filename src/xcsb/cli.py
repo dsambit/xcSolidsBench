@@ -50,6 +50,7 @@ def main(argv=None):
     s.add_argument("--e1-diag", action="store_true", help="v4: the E1 term's parts and gate diagnostics on the converged density")
     s.add_argument("--tmo-diag", action="store_true", help="TM oxides: the TM site moments within R_SITE")
     s.add_argument("--sb-diag", action="store_true", help="r2SCAN-SB: the term, lam distribution, overall and 3d region")
+    s.add_argument("--frozen-file", help="a file of functional names (one per line): their E_xc on the converged density")
     s.add_argument("--carrier-beta", type=float, help="a recorded deviation: the Broyden beta of the carrier (start) phase only")
     s.add_argument("--warm-from", help="production warm start (user-approved per point): a converged run directory whose QE "
                    "outdir (wavefunctions, rho, tau) is read; the point's earlier failed record is kept")
@@ -64,7 +65,7 @@ def main(argv=None):
     mg.add_argument("--run", required=True)
     lc = sub.add_parser("lc", help="ionic-solid lattice constants: protocol, task list, table, the banked reference record "
                         "(serial; no QE)")
-    lc.add_argument("what", choices=["protocol", "tasks", "table", "bank", "diag-summary", "mix-summary"])
+    lc.add_argument("what", choices=["protocol", "tasks", "table", "bank", "diag-summary", "mix-summary", "resp-summary"])
     lc.add_argument("--run", help="run directory (not needed for 'protocol')")
     pv = sub.add_parser("prep-variant", help="re-solve and cache the norms of norm-dependent xchole variants (serial)")
     pv.add_argument("names", nargs="+")
@@ -88,7 +89,8 @@ def main(argv=None):
         out = tiers.run_dir(a.root, a.case, a.mode, a.name) + (f"__{a.tag}" if a.tag else "")
         rec = tiers.scf(a.case, a.mode, a.name, out, a.host_check, a.payback_diag, a.maxiter, a.mixing_beta, a.mag_split,
                         a.fsm_parts, a.npool, a.ripple, a.m1_diag, a.e1_diag, a.tmo_diag, a.warm_from, a.warm_label,
-                        a.warm_mode, a.sb_diag, a.carrier_beta)
+                        a.warm_mode, a.sb_diag, a.carrier_beta,
+                        [x.strip() for x in open(a.frozen_file) if x.strip()] if a.frozen_file else None)
         ok = MPI.COMM_WORLD.bcast(rec.get("status") == "ok", root=0)
         if MPI.COMM_WORLD.Get_rank() == 0:
             print(json.dumps({"case": a.case, "mode": a.mode, "name": a.name, "status": rec.get("status"),
@@ -133,6 +135,12 @@ def main(argv=None):
             return 0
         if not a.run:
             p.error("lc tasks|table|bank need --run")
+        if a.what == "resp-summary":
+            from .studies import lif_response as LR
+            res = LR.summary(a.run)
+            json.dump(res, open(os.path.join(a.run, "resp_summary.json"), "w"), indent=1, default=float)
+            print(LR.render(res))
+            return 0
         if a.what == "mix-summary":
             res = L.mix_summary(a.run)
             json.dump(res, open(os.path.join(a.run, "mix_summary.json"), "w"), indent=1, default=float)
