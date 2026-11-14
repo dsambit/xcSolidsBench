@@ -45,7 +45,7 @@ XCHOLE_PINS = {                                              # line -> pinned xc
     # jax_si.ModelXC_SCHSI / jax_sc.sc_dict is unchanged against 0e9e8ee28; no explore/xc_pairing or spin_balance use)
     # 2026-11-14: 019c8acd6 -> 89eb63ff5 (strongxc-v3; src/ identical, `git diff 019c8acd6 89eb63ff5 -- src` empty; adds
     # explore/lif_lattice/exvar.py, read by studies.lif_response)
-    "v3.2": "e377a3e23e8cf18167b03882733fd819f9b4e1de",   # 89eb63ff5 -> e377a3e23 the same day: exvar.exc_si_variant (src identical)
+    "v3.2": "13fb9ef151cd6c8bfae7db45841f06fd88fb7741",   # 89eb63ff5 -> 13fb9ef15 the same day: exvar.exc_si_variant (src identical)
 }
 XCHOLE_LINE = os.environ.get("XCSB_XCHOLE_LINE", "v3.1")
 if XCHOLE_LINE not in XCHOLE_PINS:
