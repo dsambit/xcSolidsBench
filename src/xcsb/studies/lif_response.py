@@ -229,11 +229,12 @@ def render_xfloor(t) -> str:
 # ---- the named exchange variants of strongxc-v3 explore/lif_lattice/exvar.py (user 2026-11-14) -----------------------------------
 # GE2X-corrected iso-orbital exchange (phi), with the switch's zero moved (u0), the monotone switch (a_mono) or a floor (w0):
 # E_x of each named candidate on the converged density, serial on the root; E_tot^var = E_tot + E_x^var - E_x (first order).
-EXVAR_TAG = "exvar4"
+EXVAR_TAG = "exvar5"
 # candidates already evaluated (jobs 61283533, 61285049; exvar_summary_run1/run2 in the run dir): the GE2X-corrected phi family
 EXVAR_DONE = ("phi", "phi0", "phi_w0.25", "phi_w0.5", "phi_u1.4625", "phi_u2.211", "phi_mono3", "phi_mono1", "phi0_mono1",
               "phi_iso", "phi0_iso",
-              "phic0.75", "phic1", "w0.25", "w0.5", "iso", "u1.4625", "u2.211", "mono3", "mono1")       # run 3 (exvar3)
+              "phic0.75", "phic1", "w0.25", "w0.5", "iso", "u1.4625", "u2.211", "mono3", "mono1",        # run 3 (exvar3)
+              "m0.5_0.25", "m0.5_0.4", "m0.25_0.125", "m0.75_0.5")                                    # run 4 (exvar4)
 
 
 def exvar_post(functional_name):
